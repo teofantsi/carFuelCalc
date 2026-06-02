@@ -380,59 +380,178 @@ function renderCharts() {
   const trips = getFilteredTrips();
   const fillUpVehicleUnit = getCurrentFilterUnit(fillUps);
   const tripVehicleUnit = getCurrentFilterUnitFromTrips(trips);
+  const efficiencyValues = fillUps
+    .filter((entry) => Number.isFinite(entry.efficiency))
+    .map((entry) =>
+      normalizeEfficiency(
+        entry.efficiency,
+        getVehicleById(entry.vehicleId)?.distanceUnit || fillUpVehicleUnit
+      )
+    );
+  const priceValues = fillUps
+    .map((entry) => entry.pricePerLiter)
+    .filter((value) => Number.isFinite(value));
+  const monthlySpendValues = buildMonthlySpendSeries(fillUps, trips);
+  const tripDistanceValues = trips
+    .map((trip) => normalizeTripDistance(trip, tripVehicleUnit))
+    .filter((value) => Number.isFinite(value));
 
   const chartCards = [
     renderChartCard(
       "Efficiency",
       state.settings.consumptionMode.toUpperCase(),
-      renderLineChart(
-        fillUps
-          .filter((entry) => Number.isFinite(entry.efficiency))
-          .map((entry) =>
-            normalizeEfficiency(
-              entry.efficiency,
-              getVehicleById(entry.vehicleId)?.distanceUnit || fillUpVehicleUnit
-            )
-          ),
-        "var(--accent)"
-      )
+      buildEfficiencyMetrics(efficiencyValues),
+      renderLineChart(efficiencyValues, "var(--accent)")
     ),
     renderChartCard(
       "Fuel price trend",
       "Price per litre",
-      renderLineChart(
-        fillUps.map((entry) => entry.pricePerLiter).filter((value) => Number.isFinite(value)),
-        "var(--sky)"
-      )
+      buildPriceMetrics(priceValues),
+      renderLineChart(priceValues, "var(--sky)")
     ),
     renderChartCard(
       "Monthly spend",
       "Fuel + trip extras",
-      renderBarChart(buildMonthlySpendSeries(fillUps, trips), "var(--sage)")
+      buildMonthlySpendMetrics(monthlySpendValues),
+      renderBarChart(monthlySpendValues, "var(--sage)")
     ),
     renderChartCard(
       "Trip distance",
       tripVehicleUnit === "mi" ? "Miles per trip" : "Kilometres per trip",
-      renderBarChart(
-        trips
-          .map((trip) => normalizeTripDistance(trip, tripVehicleUnit))
-          .filter((value) => Number.isFinite(value)),
-        "var(--warn)"
-      )
+      buildTripDistanceMetrics(tripDistanceValues, tripVehicleUnit),
+      renderBarChart(tripDistanceValues, "var(--warn)")
     ),
   ];
 
   elements.chartGrid.innerHTML = chartCards.join("");
 }
 
-function renderChartCard(title, meta, surface) {
+function renderChartCard(title, meta, metrics, surface) {
   return `
     <article class="chart-card">
       <h3>${escapeHtml(title)}</h3>
       <div class="chart-meta">${escapeHtml(meta)}</div>
+      <div class="chart-metrics">${renderChartMetrics(metrics)}</div>
       <div class="chart-surface">${surface}</div>
     </article>
   `;
+}
+
+function renderChartMetrics(metrics) {
+  if (!metrics.length) {
+    return '<p class="empty">Metrics appear as you log more data.</p>';
+  }
+
+  return metrics
+    .map(
+      (metric) => `
+        <div class="chart-metric">
+          <span class="chart-metric-label">${escapeHtml(metric.label)}</span>
+          <strong class="chart-metric-value">${escapeHtml(metric.value)}</strong>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function buildEfficiencyMetrics(values) {
+  if (!values.length) {
+    return [];
+  }
+
+  const latest = values.at(-1);
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const best = Math.max(...values);
+
+  return [
+    {
+      label: "Latest",
+      value: formatEfficiencyFromNormalized(latest, state.settings.consumptionMode),
+    },
+    {
+      label: "Average",
+      value: formatEfficiencyFromNormalized(average, state.settings.consumptionMode),
+    },
+    {
+      label: "Best",
+      value: formatEfficiencyFromNormalized(best, state.settings.consumptionMode),
+    },
+  ];
+}
+
+function buildPriceMetrics(values) {
+  if (!values.length) {
+    return [];
+  }
+
+  const latest = values.at(-1);
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const highest = Math.max(...values);
+
+  return [
+    {
+      label: "Latest",
+      value: `${formatCurrency(latest)}/L`,
+    },
+    {
+      label: "Average",
+      value: `${formatCurrency(average)}/L`,
+    },
+    {
+      label: "Peak",
+      value: `${formatCurrency(highest)}/L`,
+    },
+  ];
+}
+
+function buildMonthlySpendMetrics(values) {
+  if (!values.length) {
+    return [];
+  }
+
+  const latest = values.at(-1);
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const highest = Math.max(...values);
+
+  return [
+    {
+      label: "Latest month",
+      value: formatCurrency(latest),
+    },
+    {
+      label: "Monthly avg",
+      value: formatCurrency(average),
+    },
+    {
+      label: "Peak month",
+      value: formatCurrency(highest),
+    },
+  ];
+}
+
+function buildTripDistanceMetrics(values, unit) {
+  if (!values.length) {
+    return [];
+  }
+
+  const latest = values.at(-1);
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const longest = Math.max(...values);
+
+  return [
+    {
+      label: "Latest trip",
+      value: formatDistance(latest, unit),
+    },
+    {
+      label: "Average",
+      value: formatDistance(average, unit),
+    },
+    {
+      label: "Longest",
+      value: formatDistance(longest, unit),
+    },
+  ];
 }
 
 function renderLineChart(values, color) {

@@ -446,6 +446,35 @@ table td strong {
   font-size: 0.85rem;
 }
 
+.chart-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.chart-metric {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.chart-metric-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.chart-metric-value {
+  display: block;
+  margin-top: 6px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1rem;
+}
+
 .chart-surface {
   margin-top: 14px;
   min-height: 170px;
@@ -595,6 +624,7 @@ th {
 
   .form-grid,
   .chart-grid,
+  .chart-metrics,
   .insight-list {
     grid-template-columns: 1fr;
   }
