@@ -145,6 +145,7 @@ const elements = {
   importInput: document.querySelector("#importInput"),
   weatherSummary: document.querySelector("#weatherSummary"),
   seedDemoBtn: document.querySelector("#seedDemoBtn"),
+  backfillWeatherBtn: document.querySelector("#backfillWeatherBtn"),
   statCardTemplate: document.querySelector("#statCardTemplate"),
   profileForm: document.querySelector("#profileForm"),
   profileNickname: document.querySelector("#profileNickname"),
@@ -249,6 +250,7 @@ function bindEvents() {
   elements.exportBtn.addEventListener("click", exportBackup);
   elements.importInput.addEventListener("change", importBackup);
   elements.seedDemoBtn.addEventListener("click", () => void seedDemoData());
+  elements.backfillWeatherBtn.addEventListener("click", () => void backfillFillUpWeather());
   elements.chartGrid.addEventListener("click", handleDashboardFocusClick);
 }
 
@@ -1041,6 +1043,11 @@ function renderReports() {
       description: "Spend across fuel, ownership, months, and years.",
     },
     {
+      id: "distance",
+      title: "Distance travelled",
+      description: "How far the selected vehicle or garage has actually been driven.",
+    },
+    {
       id: "performance",
       title: "Performance reports",
       description: "Efficiency, trip behavior, weather impact, and vehicle comparisons.",
@@ -1129,6 +1136,18 @@ function buildReports(fillUps, trips) {
   const weatherImpact = summarizeWeatherImpact(fillUps);
   const vehicleComparison = summarizeVehicleComparison(fillUps, trips);
   const forecast = projectNextMonthSpend(fillUps, trips);
+  const longestTripDistance = maxOf(
+    trips.map((trip) =>
+      normalizeTripDistance(
+        trip,
+        totals.distanceUnit === "mixed" ? "km" : totals.distanceUnit
+      )
+    )
+  );
+  const currentYearDistance = yearSeries.at(-1)?.tripDistance || 0;
+  const monthlyDistanceAverage = monthSeries.length
+    ? totals.tripDistance / monthSeries.length
+    : 0;
   const yearlyFigureSummary = yearSeries.length
     ? yearSeries.map((item) => `${item.year}: ${formatCurrency(item.totalSpend)}`).join(" · ")
     : "Yearly figures will appear once more data is logged.";
@@ -1167,14 +1186,28 @@ function buildReports(fillUps, trips) {
       ],
     },
     {
+      section: "distance",
+      title: "Distance travelled report",
+      summary: "A dedicated summary of total miles or kilometres covered across recorded trips.",
+      badge: trips.length ? `${trips.length} trips tracked` : "",
+      metrics: [
+        { label: "All distance", value: formatDistance(totals.tripDistance, totals.distanceUnit) },
+        { label: "This year", value: formatDistance(currentYearDistance, totals.distanceUnit) },
+        { label: "Avg per trip", value: formatDistance(totals.averageTripDistance, totals.distanceUnit) },
+        { label: "Avg per month", value: formatDistance(monthlyDistanceAverage, totals.distanceUnit) },
+        { label: "Longest trip", value: formatDistance(longestTripDistance, totals.distanceUnit) },
+        { label: "Top category", value: tripCategories[0] ? `${tripCategories[0].label} · ${tripCategories[0].count}` : "Pending" },
+      ],
+    },
+    {
       section: "performance",
       title: "Trip report",
       summary: "Distance, trip mix, and estimated fuel cost for driving activity.",
       badge: `${trips.length} trips`,
       metrics: [
-        { label: "Year distance", value: formatDistance(yearSeries.at(-1)?.tripDistance || 0, totals.distanceUnit) },
+        { label: "Year distance", value: formatDistance(currentYearDistance, totals.distanceUnit) },
         { label: "Avg trip", value: formatDistance(totals.averageTripDistance, totals.distanceUnit) },
-        { label: "Longest trip", value: formatDistance(maxOf(trips.map((trip) => normalizeTripDistance(trip, totals.distanceUnit === "mixed" ? "km" : totals.distanceUnit))), totals.distanceUnit) },
+        { label: "Longest trip", value: formatDistance(longestTripDistance, totals.distanceUnit) },
         { label: "Top category", value: tripCategories[0] ? `${tripCategories[0].label} · ${tripCategories[0].count}` : "Pending" },
       ],
     },
@@ -1615,6 +1648,8 @@ function updateFormAvailability() {
   setFormInteractive(elements.settingsForm, enabled);
   elements.syncNowBtn.disabled = !enabled || syncInFlight;
   elements.switchProfileBtn.disabled = !enabled;
+  elements.backfillWeatherBtn.disabled =
+    !enabled || !state.fillUps.some((entry) => !entry.weather);
   elements.profileNickname.disabled = enabled || syncInFlight;
   elements.profileForm.querySelector("button").disabled = enabled || syncInFlight;
 }
@@ -1926,7 +1961,11 @@ async function handleFillUpSubmit(event) {
     station: formData.get("station").toString().trim(),
     isPartial: formData.get("isPartial").toString() === "true",
     notes: formData.get("notes").toString().trim(),
-    weather: await fetchWeatherForDate(formData.get("date").toString()),
+    weather: await fetchWeatherForDate(
+      formData.get("date").toString(),
+      formData.get("station").toString().trim(),
+      { fallbackToHomeCity: true }
+    ),
   };
 
   fillUp.efficiency = computeEfficiencyForNewFillUp(fillUp);
@@ -1997,7 +2036,12 @@ async function handleTripSubmit(event) {
     startLocation: formData.get("startLocation").toString().trim(),
     endLocation: formData.get("endLocation").toString().trim(),
     notes: formData.get("notes").toString().trim(),
-    weather: await fetchWeatherForDate(formData.get("date").toString()),
+    weather: await fetchWeatherForDate(
+      formData.get("date").toString(),
+      formData.get("startLocation").toString().trim() ||
+        formData.get("endLocation").toString().trim(),
+      { fallbackToHomeCity: true }
+    ),
   });
 
   event.currentTarget.reset();
@@ -2083,6 +2127,43 @@ async function deleteOwnershipCost(entryId) {
   state.ownershipCosts = state.ownershipCosts.filter((cost) => cost.id !== entryId);
   persistAndRender();
   await syncRemoteState();
+}
+
+async function backfillFillUpWeather() {
+  if (!requireProfile()) {
+    return;
+  }
+
+  const pendingFillUps = state.fillUps.filter((entry) => !entry.weather);
+  if (!pendingFillUps.length) {
+    alert("All fill-ups already have weather saved.");
+    return;
+  }
+
+  elements.backfillWeatherBtn.disabled = true;
+  let updatedCount = 0;
+
+  try {
+    for (const fillUp of pendingFillUps) {
+      const weather = await fetchWeatherForDate(fillUp.date, fillUp.station, {
+        fallbackToHomeCity: true,
+      });
+      if (weather) {
+        fillUp.weather = weather;
+        updatedCount += 1;
+      }
+    }
+
+    persistAndRender();
+    await syncRemoteState();
+    alert(
+      updatedCount
+        ? `Filled weather for ${updatedCount} fill-up${updatedCount === 1 ? "" : "s"}.`
+        : "No historic weather could be matched from the saved fill-up locations."
+    );
+  } finally {
+    elements.backfillWeatherBtn.disabled = false;
+  }
 }
 
 async function deleteVehicle(vehicleId) {
@@ -3548,7 +3629,9 @@ async function refreshWeatherSummary() {
     return;
   }
 
-  const weather = await fetchWeatherForDate(getLocalDateString());
+  const weather = await fetchWeatherForDate(getLocalDateString(), state.settings.homeCity, {
+    fallbackToHomeCity: true,
+  });
   if (!weather) {
     elements.weatherSummary.innerHTML =
       "<strong>Weather unavailable</strong><span>The forecast provider could not be reached right now.</span>";
@@ -3561,63 +3644,93 @@ async function refreshWeatherSummary() {
   `;
 }
 
-async function fetchWeatherForDate(date) {
-  if (!state.settings.homeCity) {
+async function fetchWeatherForDate(date, locationQuery = "", options = {}) {
+  const queries = buildWeatherLocationQueries(locationQuery, options);
+  if (!queries.length) {
     return null;
   }
 
-  const key = `${state.settings.homeCity}:${state.settings.countryCode}:${date}`;
-  if (state.weatherCache[key]) {
-    return state.weatherCache[key];
-  }
-
-  try {
-    const geoUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
-    geoUrl.searchParams.set("name", state.settings.homeCity);
-    geoUrl.searchParams.set("count", "1");
-    if (state.settings.countryCode) {
-      geoUrl.searchParams.set("countryCode", state.settings.countryCode);
-    }
-    geoUrl.searchParams.set("language", "en");
-    geoUrl.searchParams.set("format", "json");
-
-    const geoResponse = await fetch(geoUrl);
-    const geoData = await geoResponse.json();
-    const location = geoData.results?.[0];
-    if (!location) {
-      return null;
+  for (const query of queries) {
+    const key = `${query}:${state.settings.countryCode}:${date}`;
+    if (state.weatherCache[key]) {
+      return state.weatherCache[key];
     }
 
-    const today = getLocalDateString();
-    const weatherUrl = new URL(
-      date >= today
-        ? "https://api.open-meteo.com/v1/forecast"
-        : "https://archive-api.open-meteo.com/v1/archive"
-    );
-    weatherUrl.searchParams.set("latitude", location.latitude);
-    weatherUrl.searchParams.set("longitude", location.longitude);
-    weatherUrl.searchParams.set("start_date", date);
-    weatherUrl.searchParams.set("end_date", date);
-    weatherUrl.searchParams.set(
-      "daily",
-      "weather_code,temperature_2m_mean,wind_speed_10m_max"
-    );
-    weatherUrl.searchParams.set("timezone", "auto");
+    try {
+      const location = await geocodeWeatherLocation(query);
+      if (!location) {
+        continue;
+      }
 
-    const weatherResponse = await fetch(weatherUrl);
-    const weatherData = await weatherResponse.json();
-    const weather = {
-      label: weatherCodes[weatherData.daily?.weather_code?.[0]] || "Conditions logged",
-      tempC: roundMaybe(weatherData.daily?.temperature_2m_mean?.[0], 1),
-      windKph: roundMaybe(weatherData.daily?.wind_speed_10m_max?.[0], 1),
-    };
+      const today = getLocalDateString();
+      const weatherUrl = new URL(
+        date >= today
+          ? "https://api.open-meteo.com/v1/forecast"
+          : "https://archive-api.open-meteo.com/v1/archive"
+      );
+      weatherUrl.searchParams.set("latitude", location.latitude);
+      weatherUrl.searchParams.set("longitude", location.longitude);
+      weatherUrl.searchParams.set("start_date", date);
+      weatherUrl.searchParams.set("end_date", date);
+      weatherUrl.searchParams.set(
+        "daily",
+        "weather_code,temperature_2m_mean,wind_speed_10m_max"
+      );
+      weatherUrl.searchParams.set("timezone", "auto");
 
-    state.weatherCache[key] = weather;
-    saveLocalState();
-    return weather;
-  } catch {
-    return null;
+      const weatherResponse = await fetch(weatherUrl);
+      const weatherData = await weatherResponse.json();
+      const weather = {
+        label: weatherCodes[weatherData.daily?.weather_code?.[0]] || "Conditions logged",
+        tempC: roundMaybe(weatherData.daily?.temperature_2m_mean?.[0], 1),
+        windKph: roundMaybe(weatherData.daily?.wind_speed_10m_max?.[0], 1),
+      };
+
+      state.weatherCache[key] = weather;
+      saveLocalState();
+      return weather;
+    } catch {
+      continue;
+    }
   }
+
+  return null;
+}
+
+function buildWeatherLocationQueries(locationQuery, options = {}) {
+  const trimmed = String(locationQuery || "").trim();
+  const queries = [];
+
+  if (trimmed) {
+    queries.push(trimmed);
+    if (state.settings.homeCity) {
+      const includesHomeCity = trimmed.toLowerCase().includes(state.settings.homeCity.toLowerCase());
+      if (!includesHomeCity) {
+        queries.push(`${trimmed}, ${state.settings.homeCity}`);
+      }
+    }
+  }
+
+  if (options.fallbackToHomeCity && state.settings.homeCity) {
+    queries.push(state.settings.homeCity);
+  }
+
+  return [...new Set(queries.filter(Boolean))];
+}
+
+async function geocodeWeatherLocation(query) {
+  const geoUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
+  geoUrl.searchParams.set("name", query);
+  geoUrl.searchParams.set("count", "1");
+  if (state.settings.countryCode) {
+    geoUrl.searchParams.set("countryCode", state.settings.countryCode);
+  }
+  geoUrl.searchParams.set("language", "en");
+  geoUrl.searchParams.set("format", "json");
+
+  const geoResponse = await fetch(geoUrl);
+  const geoData = await geoResponse.json();
+  return geoData.results?.[0] || null;
 }
 
 async function loadRemoteState() {
