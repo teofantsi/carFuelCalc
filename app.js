@@ -146,8 +146,12 @@ const elements = {
   themeToggleBtn: document.querySelector("#themeToggleBtn"),
   showVehicleSectionBtn: document.querySelector("#showVehicleSectionBtn"),
   showSettingsSectionBtn: document.querySelector("#showSettingsSectionBtn"),
+  vehicleCardToggleBtn: document.querySelector("#vehicleCardToggleBtn"),
+  settingsCardToggleBtn: document.querySelector("#settingsCardToggleBtn"),
   vehicleCard: document.querySelector("#vehicleCard"),
   settingsCard: document.querySelector("#settingsCard"),
+  vehicleCardContent: document.querySelector("#vehicleCardContent"),
+  settingsCardContent: document.querySelector("#settingsCardContent"),
 };
 
 void init();
@@ -180,6 +184,12 @@ function bindEvents() {
     toggleSection("vehicle")
   );
   elements.showSettingsSectionBtn.addEventListener("click", () =>
+    toggleSection("settings")
+  );
+  elements.vehicleCardToggleBtn.addEventListener("click", () =>
+    toggleSection("vehicle")
+  );
+  elements.settingsCardToggleBtn.addEventListener("click", () =>
     toggleSection("settings")
   );
   elements.vehicleForm.addEventListener("submit", handleVehicleSubmit);
@@ -1179,13 +1189,21 @@ function buildReports(fillUps, trips) {
 }
 
 function renderSectionVisibility() {
-  elements.vehicleCard.hidden = !sectionVisibility.vehicle;
-  elements.settingsCard.hidden = !sectionVisibility.settings;
+  elements.vehicleCardContent.hidden = !sectionVisibility.vehicle;
+  elements.settingsCardContent.hidden = !sectionVisibility.settings;
   elements.showVehicleSectionBtn.setAttribute(
     "aria-expanded",
     String(sectionVisibility.vehicle)
   );
   elements.showSettingsSectionBtn.setAttribute(
+    "aria-expanded",
+    String(sectionVisibility.settings)
+  );
+  elements.vehicleCardToggleBtn.setAttribute(
+    "aria-expanded",
+    String(sectionVisibility.vehicle)
+  );
+  elements.settingsCardToggleBtn.setAttribute(
     "aria-expanded",
     String(sectionVisibility.settings)
   );
@@ -1195,6 +1213,12 @@ function renderSectionVisibility() {
   elements.showSettingsSectionBtn.textContent = sectionVisibility.settings
     ? "Close settings"
     : "Open settings";
+  elements.vehicleCardToggleBtn.textContent = sectionVisibility.vehicle
+    ? "Close"
+    : "Open";
+  elements.settingsCardToggleBtn.textContent = sectionVisibility.settings
+    ? "Close"
+    : "Open";
 }
 
 function revealSection(sectionKey) {
