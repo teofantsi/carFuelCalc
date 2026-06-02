@@ -403,10 +403,9 @@ function renderCharts() {
       state.settings.consumptionMode.toUpperCase(),
       buildEfficiencyMetrics(efficiencyValues),
       renderLineChart(efficiencyValues, "var(--accent)", {
-        yFormatter: (value) =>
-          formatEfficiencyFromNormalized(value, state.settings.consumptionMode),
-        xStartLabel: "First",
-        xEndLabel: "Latest",
+        yFormatter: (value) => formatAxisNumber(value, 1),
+        xStartLabel: "Start",
+        xEndLabel: "Now",
       })
     ),
     renderChartCard(
@@ -414,9 +413,9 @@ function renderCharts() {
       "Price per litre",
       buildPriceMetrics(priceValues),
       renderLineChart(priceValues, "var(--sky)", {
-        yFormatter: (value) => `${formatCurrency(value)}/L`,
-        xStartLabel: "First",
-        xEndLabel: "Latest",
+        yFormatter: (value) => formatCurrency(value),
+        xStartLabel: "Start",
+        xEndLabel: "Now",
       })
     ),
     renderChartCard(
@@ -426,7 +425,7 @@ function renderCharts() {
       renderBarChart(monthlySpendValues, "var(--sage)", {
         yFormatter: (value) => formatCurrency(value),
         xStartLabel: monthlySpendSeries[0]?.label || "Start",
-        xEndLabel: monthlySpendSeries.at(-1)?.label || "Latest",
+        xEndLabel: monthlySpendSeries.at(-1)?.label || "Now",
       })
     ),
     renderChartCard(
@@ -434,9 +433,9 @@ function renderCharts() {
       tripVehicleUnit === "mi" ? "Miles per trip" : "Kilometres per trip",
       buildTripDistanceMetrics(tripDistanceValues, tripVehicleUnit),
       renderBarChart(tripDistanceValues, "var(--warn)", {
-        yFormatter: (value) => formatDistance(value, tripVehicleUnit),
-        xStartLabel: "First",
-        xEndLabel: "Latest",
+        yFormatter: (value) => formatAxisDistance(value, tripVehicleUnit),
+        xStartLabel: "Start",
+        xEndLabel: "Now",
       })
     ),
   ];
@@ -583,14 +582,14 @@ function renderLineChart(values, color, options = {}) {
   const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
   const points = values
     .map((value, index) => {
-      const x = 12 + (index / Math.max(values.length - 1, 1)) * 76;
-      const y = 78 - ((value - min) / Math.max(max - min, 1)) * 50;
+      const x = 26 + (index / Math.max(values.length - 1, 1)) * 124;
+      const y = 76 - ((value - min) / Math.max(max - min, 1)) * 46;
       return `${x},${y}`;
     })
     .join(" ");
 
   return `
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       ${renderChartAxes({
         minLabel: yFormatter(min),
         midLabel: yFormatter(mid),
@@ -629,15 +628,15 @@ function renderBarChart(values, color, options = {}) {
   const bars = values
     .slice(-8)
     .map((value, index, series) => {
-      const barWidth = 72 / series.length;
-      const x = 14 + index * barWidth;
-      const height = (value / max) * 54;
+      const barWidth = 118 / series.length;
+      const x = 30 + index * barWidth;
+      const height = (value / max) * 50;
       return `<rect x="${x}" y="${86 - height}" width="${Math.max(barWidth - 2, 4)}" height="${height}" rx="3" fill="${color}" opacity="0.86" />`;
     })
     .join("");
 
   return `
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       ${renderChartAxes({
         minLabel: yFormatter(0),
         midLabel: yFormatter(mid),
@@ -653,15 +652,15 @@ function renderBarChart(values, color, options = {}) {
 function renderChartAxes({ minLabel, midLabel, maxLabel, xStartLabel, xEndLabel }) {
   return `
     <g class="chart-axis-group">
-      <line x1="12" y1="78" x2="88" y2="78" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
-      <line x1="12" y1="53" x2="88" y2="53" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
-      <line x1="12" y1="28" x2="88" y2="28" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
-      <line x1="12" y1="78" x2="88" y2="78" stroke="var(--chart-axis)" stroke-width="1" />
-      <text x="2" y="80" class="chart-axis-text">${escapeHtml(minLabel)}</text>
-      <text x="2" y="55" class="chart-axis-text">${escapeHtml(midLabel)}</text>
-      <text x="2" y="30" class="chart-axis-text">${escapeHtml(maxLabel)}</text>
-      <text x="12" y="92" class="chart-axis-text">${escapeHtml(xStartLabel)}</text>
-      <text x="88" y="92" text-anchor="end" class="chart-axis-text">${escapeHtml(xEndLabel)}</text>
+      <line x1="26" y1="76" x2="150" y2="76" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="26" y1="53" x2="150" y2="53" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="26" y1="30" x2="150" y2="30" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="26" y1="76" x2="150" y2="76" stroke="var(--chart-axis)" stroke-width="1" />
+      <text x="22" y="78" text-anchor="end" class="chart-axis-text">${escapeHtml(minLabel)}</text>
+      <text x="22" y="55" text-anchor="end" class="chart-axis-text">${escapeHtml(midLabel)}</text>
+      <text x="22" y="32" text-anchor="end" class="chart-axis-text">${escapeHtml(maxLabel)}</text>
+      <text x="26" y="90" class="chart-axis-text">${escapeHtml(xStartLabel)}</text>
+      <text x="150" y="90" text-anchor="end" class="chart-axis-text">${escapeHtml(xEndLabel)}</text>
     </g>
   `;
 }
@@ -2222,8 +2221,15 @@ function formatMonthLabel(value) {
   const date = new Date(Number(year), Number(month) - 1, 1);
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
-    year: "2-digit",
   }).format(date);
+}
+
+function formatAxisNumber(value, digits = 1) {
+  return Number(value).toFixed(digits);
+}
+
+function formatAxisDistance(value, unit) {
+  return `${formatAxisNumber(value, value >= 100 ? 0 : 1)} ${unit}`;
 }
 
 function roundMaybe(value, digits) {

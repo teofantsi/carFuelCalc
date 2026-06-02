@@ -493,7 +493,7 @@ table td strong {
 
 .chart-axis-text {
   fill: var(--muted);
-  font-size: 4.6px;
+  font-size: 4px;
   letter-spacing: 0.02em;
 }
 
