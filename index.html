@@ -15,7 +15,18 @@
   <body>
     <div class="shell">
       <aside class="hero">
-        <p class="eyebrow">GitHub Pages + Supabase Fuel Tracker</p>
+        <div class="hero-topbar">
+          <p class="eyebrow">GitHub Pages + Supabase Fuel Tracker</p>
+          <button
+            id="themeToggleBtn"
+            class="theme-toggle"
+            type="button"
+            aria-label="Switch color theme"
+            aria-pressed="false"
+          >
+            Dark mode
+          </button>
+        </div>
         <h1>Road Ledger</h1>
         <p class="hero-copy">
           Track vehicles, fuel-ups, trips, spend, efficiency, and weather in a
@@ -69,7 +80,7 @@
               <button id="exportBtn" class="ghost-button" type="button">Export backup</button>
               <label class="ghost-button file-button">
                 Import backup
-                <input id="importInput" type="file" accept="application/json" />
+                <input id="importInput" type="file" accept=".csv,text/csv" />
               </label>
             </div>
           </section>
@@ -102,6 +113,24 @@
             </div>
             <form id="vehicleForm" class="stack-form">
               <label>
+                UK registration
+                <div class="inline-action">
+                  <input
+                    name="registrationNumber"
+                    maxlength="8"
+                    autocapitalize="characters"
+                    placeholder="AB12CDE"
+                  />
+                  <button id="plateLookupBtn" type="button" class="ghost-button dark-ghost">
+                    Look up plate
+                  </button>
+                </div>
+              </label>
+              <div id="vehicleLookupStatus" class="lookup-status empty">
+                Enter a UK number plate to prefill fuel type and estimate consumption.
+              </div>
+              <div id="vehicleLookupSummary" class="lookup-summary" hidden></div>
+              <label>
                 Vehicle name
                 <input name="name" required placeholder="2018 Ford Fiesta" />
               </label>
@@ -121,8 +150,8 @@
               <label>
                 Odometer unit
                 <select name="distanceUnit" required>
-                  <option value="km">Kilometres</option>
                   <option value="mi">Miles</option>
+                  <option value="km">Kilometres</option>
                 </select>
               </label>
               <button type="submit" class="primary-button">Save vehicle</button>

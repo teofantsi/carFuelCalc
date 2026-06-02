@@ -3,6 +3,50 @@ const SUPABASE_URL = "https://lzbymvbbhpqmgpggrxaj.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY =
   "sb_publishable_mEK9Y8QpniN3g62SH8CYog_ODItP59c";
 const API_URL = `${SUPABASE_URL}/functions/v1/road-ledger-api`;
+const BACKUP_CSV_VERSION = "1";
+const BACKUP_CSV_COLUMNS = [
+  "backupVersion",
+  "recordType",
+  "id",
+  "vehicleId",
+  "date",
+  "currency",
+  "homeCity",
+  "countryCode",
+  "consumptionMode",
+  "theme",
+  "name",
+  "fuelType",
+  "tankSize",
+  "distanceUnit",
+  "registrationNumber",
+  "make",
+  "yearOfManufacture",
+  "monthOfFirstRegistration",
+  "engineCapacity",
+  "co2Emissions",
+  "estimatedConsumptionLPer100km",
+  "estimatedConsumptionMpgUk",
+  "lookupSource",
+  "odometer",
+  "liters",
+  "totalCost",
+  "pricePerLiter",
+  "station",
+  "isPartial",
+  "notes",
+  "efficiency",
+  "startOdometer",
+  "endOdometer",
+  "distance",
+  "category",
+  "litersUsed",
+  "startLocation",
+  "endLocation",
+  "weatherLabel",
+  "weatherTempC",
+  "weatherWindKph",
+];
 
 const defaultState = {
   session: {
@@ -18,6 +62,7 @@ const defaultState = {
     homeCity: "",
     countryCode: "",
     consumptionMode: "lPer100km",
+    theme: "light",
   },
   vehicles: [],
   fillUps: [],
@@ -49,6 +94,7 @@ const weatherCodes = {
 
 let state = loadState();
 let syncInFlight = false;
+let vehicleLookupResult = null;
 
 const elements = {
   statsGrid: document.querySelector("#statsGrid"),
@@ -56,6 +102,9 @@ const elements = {
   insightList: document.querySelector("#insightList"),
   vehicleForm: document.querySelector("#vehicleForm"),
   vehicleList: document.querySelector("#vehicleList"),
+  plateLookupBtn: document.querySelector("#plateLookupBtn"),
+  vehicleLookupStatus: document.querySelector("#vehicleLookupStatus"),
+  vehicleLookupSummary: document.querySelector("#vehicleLookupSummary"),
   fillUpForm: document.querySelector("#fillUpForm"),
   fillUpTableBody: document.querySelector("#fillUpTableBody"),
   tripForm: document.querySelector("#tripForm"),
@@ -74,11 +123,13 @@ const elements = {
   syncBadge: document.querySelector("#syncBadge"),
   syncNowBtn: document.querySelector("#syncNowBtn"),
   switchProfileBtn: document.querySelector("#switchProfileBtn"),
+  themeToggleBtn: document.querySelector("#themeToggleBtn"),
 };
 
 void init();
 
 async function init() {
+  applyTheme();
   recomputeEfficiencies();
   bindEvents();
   syncFormsFromState();
@@ -97,10 +148,13 @@ async function init() {
 }
 
 function bindEvents() {
+  elements.themeToggleBtn.addEventListener("click", toggleTheme);
   elements.profileForm.addEventListener("submit", handleProfileSubmit);
   elements.syncNowBtn.addEventListener("click", () => void syncRemoteState(true));
   elements.switchProfileBtn.addEventListener("click", handleSwitchProfile);
   elements.vehicleForm.addEventListener("submit", handleVehicleSubmit);
+  elements.plateLookupBtn.addEventListener("click", () => void handlePlateLookup());
+  elements.vehicleForm.registrationNumber.addEventListener("input", handleRegistrationInput);
   elements.fillUpForm.addEventListener("submit", (event) => void handleFillUpSubmit(event));
   elements.tripForm.addEventListener("submit", (event) => void handleTripSubmit(event));
   elements.settingsForm.addEventListener("submit", handleSettingsSubmit);
@@ -152,6 +206,9 @@ function syncFormsFromState() {
   elements.fillUpForm.date.value = getLocalDateString();
   elements.tripForm.date.value = getLocalDateString();
   elements.profileNickname.value = state.session.nickname || "";
+  elements.vehicleForm.distanceUnit.value = "mi";
+  elements.vehicleForm.fuelType.value = "Petrol";
+  resetVehicleLookupUi();
 }
 
 function render() {
@@ -247,13 +304,18 @@ function renderVehicleList() {
   elements.vehicleList.innerHTML = state.vehicles
     .map((vehicle) => {
       const tripCount = state.trips.filter((trip) => trip.vehicleId === vehicle.id).length;
+      const registrationMeta = vehicle.registrationNumber
+        ? ` · ${escapeHtml(formatRegistrationForDisplay(vehicle.registrationNumber))}`
+        : "";
+      const consumptionMeta = describeVehicleConsumption(vehicle);
       return `
         <div class="list-item">
           <div>
             <strong>${escapeHtml(vehicle.name)}</strong>
             <span class="meta">${escapeHtml(vehicle.fuelType)} · ${vehicle.distanceUnit.toUpperCase()}${
               vehicle.tankSize ? ` · ${vehicle.tankSize}L tank` : ""
-            }</span>
+            }${registrationMeta}</span>
+            ${consumptionMeta ? `<span class="meta">${escapeHtml(consumptionMeta)}</span>` : ""}
           </div>
           <span class="chip">${countVehicleEntries(vehicle.id)} fill-ups · ${tripCount} trips</span>
         </div>
@@ -332,7 +394,7 @@ function renderCharts() {
               getVehicleById(entry.vehicleId)?.distanceUnit || fillUpVehicleUnit
             )
           ),
-        "#cb5d2d"
+        "var(--accent)"
       )
     ),
     renderChartCard(
@@ -340,13 +402,13 @@ function renderCharts() {
       "Price per litre",
       renderLineChart(
         fillUps.map((entry) => entry.pricePerLiter).filter((value) => Number.isFinite(value)),
-        "#3a7094"
+        "var(--sky)"
       )
     ),
     renderChartCard(
       "Monthly spend",
       "Fuel + trip extras",
-      renderBarChart(buildMonthlySpendSeries(fillUps, trips), "#5f7c63")
+      renderBarChart(buildMonthlySpendSeries(fillUps, trips), "var(--sage)")
     ),
     renderChartCard(
       "Trip distance",
@@ -355,7 +417,7 @@ function renderCharts() {
         trips
           .map((trip) => normalizeTripDistance(trip, tripVehicleUnit))
           .filter((value) => Number.isFinite(value)),
-        "#b56d16"
+        "var(--warn)"
       )
     ),
   ];
@@ -428,7 +490,7 @@ function renderBarChart(values, color) {
 
   return `
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      <line x1="8" y1="86" x2="94" y2="86" stroke="rgba(0,0,0,0.12)" stroke-width="1" />
+      <line x1="8" y1="86" x2="94" y2="86" stroke="var(--chart-axis)" stroke-width="1" />
       ${bars}
     </svg>
   `;
@@ -595,6 +657,120 @@ function handleSwitchProfile() {
   void refreshWeatherSummary();
 }
 
+function handleRegistrationInput(event) {
+  const registrationNumber = normalizeRegistration(event.target.value);
+  event.target.value = formatRegistrationForDisplay(registrationNumber);
+  if (
+    vehicleLookupResult &&
+    vehicleLookupResult.registrationNumber !== registrationNumber
+  ) {
+    vehicleLookupResult = null;
+    setVehicleLookupStatus(
+      "empty",
+      "Registration changed. Run the plate lookup again to refresh the DVLA match."
+    );
+    renderVehicleLookupSummary(null);
+  }
+}
+
+async function handlePlateLookup() {
+  if (!requireProfile()) {
+    return;
+  }
+
+  const registrationNumber = normalizeRegistration(
+    elements.vehicleForm.registrationNumber.value
+  );
+  if (!registrationNumber) {
+    setVehicleLookupStatus("warn", "Enter a UK number plate before looking it up.");
+    renderVehicleLookupSummary(null);
+    return;
+  }
+
+  setVehicleLookupStatus("empty", "Looking up DVLA vehicle details...");
+  renderVehicleLookupSummary(null);
+  elements.plateLookupBtn.disabled = true;
+
+  try {
+    const response = await callApi("lookupVehicle", { registrationNumber });
+    vehicleLookupResult = response.vehicle;
+    applyLookupToVehicleForm(vehicleLookupResult);
+    setVehicleLookupStatus(
+      "good",
+      vehicleLookupResult.estimatedConsumption
+        ? "DVLA match found. Consumption has been estimated from the vehicle's CO2 record."
+        : "DVLA match found. Fuel type was filled in, but consumption could not be estimated automatically."
+    );
+    renderVehicleLookupSummary(vehicleLookupResult);
+  } catch (error) {
+    vehicleLookupResult = null;
+    setVehicleLookupStatus("warn", error.message || "Could not look up that registration.");
+    renderVehicleLookupSummary(null);
+  } finally {
+    elements.plateLookupBtn.disabled = false;
+  }
+}
+
+function applyLookupToVehicleForm(vehicle) {
+  const registrationNumber = formatRegistrationForDisplay(vehicle.registrationNumber);
+  const year = vehicle.yearOfManufacture || vehicle.monthOfFirstRegistration?.slice(0, 4) || "";
+  const make = toTitleCase(vehicle.make || "");
+  const currentName = elements.vehicleForm.name.value.trim();
+  const shouldReplaceName =
+    !currentName || currentName === elements.vehicleForm.name.defaultValue;
+
+  elements.vehicleForm.registrationNumber.value = registrationNumber;
+  elements.vehicleForm.fuelType.value = mapFuelTypeForForm(vehicle.fuelType);
+  elements.vehicleForm.distanceUnit.value = "mi";
+
+  if (shouldReplaceName) {
+    elements.vehicleForm.name.value = [year, make].filter(Boolean).join(" ") || registrationNumber;
+  }
+}
+
+function resetVehicleLookupUi() {
+  vehicleLookupResult = null;
+  elements.vehicleForm.registrationNumber.value = "";
+  setVehicleLookupStatus(
+    "empty",
+    "Enter a UK number plate to prefill fuel type and estimate consumption."
+  );
+  renderVehicleLookupSummary(null);
+}
+
+function setVehicleLookupStatus(level, message) {
+  elements.vehicleLookupStatus.className = `lookup-status${level === "empty" ? " empty" : ` ${level}`}`;
+  elements.vehicleLookupStatus.textContent = message;
+}
+
+function renderVehicleLookupSummary(vehicle) {
+  if (!vehicle) {
+    elements.vehicleLookupSummary.hidden = true;
+    elements.vehicleLookupSummary.innerHTML = "";
+    return;
+  }
+
+  const summaryLines = [
+    vehicle.yearOfManufacture
+      ? `${vehicle.yearOfManufacture} ${toTitleCase(vehicle.make || "")}`.trim()
+      : toTitleCase(vehicle.make || ""),
+    vehicle.engineCapacity ? `${vehicle.engineCapacity} cc` : "",
+    vehicle.co2Emissions ? `${vehicle.co2Emissions} g/km CO2` : "",
+    vehicle.fuelType ? toTitleCase(vehicle.fuelType) : "",
+  ].filter(Boolean);
+  const estimated = vehicle.estimatedConsumption
+    ? `${vehicle.estimatedConsumption.lPer100km.toFixed(1)} L/100km · ${vehicle.estimatedConsumption.mpgUk.toFixed(1)} mpg UK`
+    : "No automatic consumption estimate was available for this fuel type.";
+
+  elements.vehicleLookupSummary.hidden = false;
+  elements.vehicleLookupSummary.innerHTML = `
+    <strong>${escapeHtml(formatRegistrationForDisplay(vehicle.registrationNumber))}</strong>
+    <span class="meta">${escapeHtml(summaryLines.join(" · "))}</span>
+    <span class="meta">${escapeHtml(estimated)}</span>
+    <span class="meta">Source: DVLA vehicle data${vehicle.estimatedConsumption ? " with consumption estimated from CO2." : "."}</span>
+  `;
+}
+
 function handleVehicleSubmit(event) {
   event.preventDefault();
   if (!requireProfile()) {
@@ -602,17 +778,34 @@ function handleVehicleSubmit(event) {
   }
 
   const formData = new FormData(event.currentTarget);
+  const registrationNumber = normalizeRegistration(formData.get("registrationNumber"));
+  const lookupForVehicle =
+    vehicleLookupResult &&
+    vehicleLookupResult.registrationNumber === registrationNumber
+      ? vehicleLookupResult
+      : null;
+
   state.vehicles.push({
     id: crypto.randomUUID(),
     name: formData.get("name").toString().trim(),
     fuelType: formData.get("fuelType").toString(),
     tankSize: numberOrNull(formData.get("tankSize")),
     distanceUnit: formData.get("distanceUnit").toString(),
+    registrationNumber,
+    make: lookupForVehicle?.make || "",
+    yearOfManufacture: lookupForVehicle?.yearOfManufacture || null,
+    monthOfFirstRegistration: lookupForVehicle?.monthOfFirstRegistration || "",
+    engineCapacity: lookupForVehicle?.engineCapacity ?? null,
+    co2Emissions: lookupForVehicle?.co2Emissions ?? null,
+    estimatedConsumption:
+      lookupForVehicle?.estimatedConsumption || null,
+    lookupSource: lookupForVehicle?.lookupSource || null,
   });
 
   event.currentTarget.reset();
-  event.currentTarget.distanceUnit.value = "km";
+  event.currentTarget.distanceUnit.value = "mi";
   event.currentTarget.fuelType.value = "Petrol";
+  resetVehicleLookupUi();
   persistAndRender();
   void syncRemoteState();
 }
@@ -718,8 +911,10 @@ function handleSettingsSubmit(event) {
     homeCity: formData.get("homeCity").toString().trim(),
     countryCode: formData.get("countryCode").toString().trim().toUpperCase(),
     consumptionMode: formData.get("consumptionMode").toString(),
+    theme: state.settings.theme || "light",
   };
 
+  applyTheme();
   persistAndRender();
   void syncRemoteState();
   void refreshWeatherSummary();
@@ -739,13 +934,13 @@ async function deleteTrip(entryId) {
 }
 
 function exportBackup() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], {
-    type: "application/json",
+  const blob = new Blob([buildBackupCsv()], {
+    type: "text/csv;charset=utf-8",
   });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `road-ledger-backup-${getLocalDateString()}.json`;
+  link.download = `road-ledger-backup-${getLocalDateString()}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -759,17 +954,323 @@ function importBackup(event) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      state = mergeState(JSON.parse(reader.result));
+      state = importBackupCsv(reader.result);
       recomputeEfficiencies();
       saveLocalState();
+      applyTheme();
       syncFormsFromState();
       render();
+      void syncRemoteState();
       void refreshWeatherSummary();
     } catch {
-      alert("That backup file could not be read.");
+      alert("That CSV backup file could not be read.");
     }
   };
   reader.readAsText(file);
+  event.target.value = "";
+}
+
+function buildBackupCsv() {
+  const rows = [
+    {
+      backupVersion: BACKUP_CSV_VERSION,
+      recordType: "settings",
+      currency: state.settings.currency,
+      homeCity: state.settings.homeCity,
+      countryCode: state.settings.countryCode,
+      consumptionMode: state.settings.consumptionMode,
+      theme: state.settings.theme,
+    },
+    ...state.vehicles.map((vehicle) => ({
+      backupVersion: BACKUP_CSV_VERSION,
+      recordType: "vehicle",
+      id: vehicle.id,
+      name: vehicle.name,
+      fuelType: vehicle.fuelType,
+      tankSize: vehicle.tankSize,
+      distanceUnit: vehicle.distanceUnit,
+      registrationNumber: vehicle.registrationNumber,
+      make: vehicle.make,
+      yearOfManufacture: vehicle.yearOfManufacture,
+      monthOfFirstRegistration: vehicle.monthOfFirstRegistration,
+      engineCapacity: vehicle.engineCapacity,
+      co2Emissions: vehicle.co2Emissions,
+      estimatedConsumptionLPer100km: vehicle.estimatedConsumption?.lPer100km,
+      estimatedConsumptionMpgUk: vehicle.estimatedConsumption?.mpgUk,
+      lookupSource: vehicle.lookupSource,
+    })),
+    ...state.fillUps.map((entry) => ({
+      backupVersion: BACKUP_CSV_VERSION,
+      recordType: "fillUp",
+      id: entry.id,
+      vehicleId: entry.vehicleId,
+      date: entry.date,
+      odometer: entry.odometer,
+      liters: entry.liters,
+      totalCost: entry.totalCost,
+      pricePerLiter: entry.pricePerLiter,
+      station: entry.station,
+      isPartial: entry.isPartial,
+      notes: entry.notes,
+      efficiency: entry.efficiency,
+      weatherLabel: entry.weather?.label,
+      weatherTempC: entry.weather?.tempC,
+      weatherWindKph: entry.weather?.windKph,
+    })),
+    ...state.trips.map((trip) => ({
+      backupVersion: BACKUP_CSV_VERSION,
+      recordType: "trip",
+      id: trip.id,
+      vehicleId: trip.vehicleId,
+      date: trip.date,
+      startOdometer: trip.startOdometer,
+      endOdometer: trip.endOdometer,
+      distance: trip.distance,
+      category: trip.category,
+      totalCost: trip.totalCost,
+      litersUsed: trip.litersUsed,
+      startLocation: trip.startLocation,
+      endLocation: trip.endLocation,
+      notes: trip.notes,
+      weatherLabel: trip.weather?.label,
+      weatherTempC: trip.weather?.tempC,
+      weatherWindKph: trip.weather?.windKph,
+    })),
+  ];
+
+  return serializeCsvRows(rows, BACKUP_CSV_COLUMNS);
+}
+
+function importBackupCsv(csvText) {
+  const rows = parseCsvRows(csvText);
+  const imported = {
+    session: { ...state.session },
+    settings: { ...defaultState.settings },
+    vehicles: [],
+    fillUps: [],
+    trips: [],
+    weatherCache: {},
+  };
+
+  for (const row of rows) {
+    switch (row.recordType) {
+      case "settings":
+        imported.settings = {
+          currency: row.currency || defaultState.settings.currency,
+          homeCity: row.homeCity || "",
+          countryCode: row.countryCode || "",
+          consumptionMode: row.consumptionMode || defaultState.settings.consumptionMode,
+          theme: row.theme === "dark" ? "dark" : "light",
+        };
+        break;
+      case "vehicle":
+        imported.vehicles.push({
+          id: row.id || crypto.randomUUID(),
+          name: row.name || "Imported vehicle",
+          fuelType: row.fuelType || "Petrol",
+          tankSize: parseNullableNumber(row.tankSize),
+          distanceUnit: row.distanceUnit === "mi" ? "mi" : "km",
+          registrationNumber: row.registrationNumber || "",
+          make: row.make || "",
+          yearOfManufacture: parseNullableNumber(row.yearOfManufacture),
+          monthOfFirstRegistration: row.monthOfFirstRegistration || "",
+          engineCapacity: parseNullableNumber(row.engineCapacity),
+          co2Emissions: parseNullableNumber(row.co2Emissions),
+          estimatedConsumption: buildEstimatedConsumption(row),
+          lookupSource: row.lookupSource || null,
+        });
+        break;
+      case "fillUp":
+        {
+          const liters = parseNumberOrZero(row.liters);
+          const totalCost = parseNumberOrZero(row.totalCost);
+          const importedPricePerLiter = parseNullableNumber(row.pricePerLiter);
+          imported.fillUps.push({
+            id: row.id || crypto.randomUUID(),
+            vehicleId: row.vehicleId || "",
+            date: row.date || "",
+            odometer: parseNumberOrZero(row.odometer),
+            liters,
+            totalCost,
+            pricePerLiter: importedPricePerLiter ?? (liters ? totalCost / liters : 0),
+            station: row.station || "",
+            isPartial: parseBooleanCell(row.isPartial),
+            notes: row.notes || "",
+            efficiency: parseNullableNumber(row.efficiency),
+            weather: buildWeatherSnapshot(row),
+          });
+        }
+        break;
+      case "trip":
+        {
+          const startOdometer = parseNumberOrZero(row.startOdometer);
+          const endOdometer = parseNumberOrZero(row.endOdometer);
+          const importedDistance = parseNullableNumber(row.distance);
+          imported.trips.push({
+            id: row.id || crypto.randomUUID(),
+            vehicleId: row.vehicleId || "",
+            date: row.date || "",
+            startOdometer,
+            endOdometer,
+            distance: importedDistance ?? Math.max(endOdometer - startOdometer, 0),
+            category: row.category || "",
+            totalCost: parseNumberOrZero(row.totalCost),
+            litersUsed: parseNullableNumber(row.litersUsed),
+            startLocation: row.startLocation || "",
+            endLocation: row.endLocation || "",
+            notes: row.notes || "",
+            weather: buildWeatherSnapshot(row),
+          });
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (
+    !rows.length ||
+    !rows.some((row) =>
+      ["settings", "vehicle", "fillUp", "trip"].includes(row.recordType)
+    )
+  ) {
+    throw new Error("Empty backup.");
+  }
+
+  return mergeState(imported);
+}
+
+function buildEstimatedConsumption(row) {
+  const lPer100km = parseNullableNumber(row.estimatedConsumptionLPer100km);
+  const mpgUk = parseNullableNumber(row.estimatedConsumptionMpgUk);
+  if (lPer100km === null && mpgUk === null) {
+    return null;
+  }
+  return { lPer100km, mpgUk };
+}
+
+function buildWeatherSnapshot(row) {
+  if (!row.weatherLabel && row.weatherTempC === "" && row.weatherWindKph === "") {
+    return null;
+  }
+  return {
+    label: row.weatherLabel || "",
+    tempC: parseNullableNumber(row.weatherTempC),
+    windKph: parseNullableNumber(row.weatherWindKph),
+  };
+}
+
+function serializeCsvRows(rows, columns) {
+  const lines = [columns.join(",")];
+  for (const row of rows) {
+    lines.push(columns.map((column) => escapeCsvCell(row[column])).join(","));
+  }
+  return lines.join("\n");
+}
+
+function escapeCsvCell(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  const normalized = String(value);
+  if (/["\n,]/.test(normalized)) {
+    return `"${normalized.replaceAll('"', '""')}"`;
+  }
+  return normalized;
+}
+
+function parseCsvRows(csvText) {
+  const table = parseCsvTable(String(csvText).replace(/^\uFEFF/, ""));
+  if (!table.length) {
+    return [];
+  }
+
+  const [header, ...dataRows] = table;
+  return dataRows
+    .filter((row) => row.some((cell) => cell !== ""))
+    .map((row) =>
+      Object.fromEntries(
+        header.map((column, index) => [column, row[index] ?? ""])
+      )
+    );
+}
+
+function parseCsvTable(csvText) {
+  const rows = [];
+  let currentRow = [];
+  let currentCell = "";
+  let insideQuotes = false;
+
+  for (let index = 0; index < csvText.length; index += 1) {
+    const char = csvText[index];
+
+    if (insideQuotes) {
+      if (char === '"') {
+        if (csvText[index + 1] === '"') {
+          currentCell += '"';
+          index += 1;
+        } else {
+          insideQuotes = false;
+        }
+      } else {
+        currentCell += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      insideQuotes = true;
+      continue;
+    }
+
+    if (char === ",") {
+      currentRow.push(currentCell);
+      currentCell = "";
+      continue;
+    }
+
+    if (char === "\n") {
+      currentRow.push(currentCell);
+      rows.push(currentRow);
+      currentRow = [];
+      currentCell = "";
+      continue;
+    }
+
+    if (char === "\r") {
+      continue;
+    }
+
+    currentCell += char;
+  }
+
+  if (insideQuotes) {
+    throw new Error("Unclosed quoted field.");
+  }
+
+  if (currentCell !== "" || currentRow.length) {
+    currentRow.push(currentCell);
+    rows.push(currentRow);
+  }
+
+  return rows;
+}
+
+function parseNullableNumber(value) {
+  if (value === "") {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseNumberOrZero(value) {
+  return parseNullableNumber(value) ?? 0;
+}
+
+function parseBooleanCell(value) {
+  return String(value).toLowerCase() === "true";
 }
 
 async function seedDemoData() {
@@ -791,6 +1292,7 @@ async function seedDemoData() {
     homeCity: "London",
     countryCode: "GB",
     consumptionMode: "lPer100km",
+    theme: state.settings.theme || "light",
   };
   state.vehicles = [
     {
@@ -1044,6 +1546,51 @@ function formatTripEfficiency(trip, vehicleUnit) {
   );
 }
 
+function describeVehicleConsumption(vehicle) {
+  if (!vehicle?.estimatedConsumption) {
+    return "";
+  }
+  return `Estimated ${vehicle.estimatedConsumption.lPer100km.toFixed(1)} L/100km · ${vehicle.estimatedConsumption.mpgUk.toFixed(1)} mpg UK`;
+}
+
+function normalizeRegistration(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function formatRegistrationForDisplay(value) {
+  const registration = normalizeRegistration(value);
+  if (registration.length === 7) {
+    return `${registration.slice(0, 4)} ${registration.slice(4)}`;
+  }
+  return registration;
+}
+
+function mapFuelTypeForForm(value) {
+  const normalized = String(value || "").toUpperCase();
+  if (normalized.includes("DIESEL")) {
+    return "Diesel";
+  }
+  if (normalized.includes("HYBRID")) {
+    return "Hybrid";
+  }
+  if (
+    normalized.includes("ELECTRIC") ||
+    normalized.includes("BEV") ||
+    normalized.includes("BATTERY")
+  ) {
+    return "Electric";
+  }
+  return "Petrol";
+}
+
+function toTitleCase(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function formatCurrency(amount) {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
@@ -1257,12 +1804,26 @@ function applyRemoteResponse(response) {
     : [];
   recomputeEfficiencies();
   saveLocalState();
+  applyTheme();
   syncFormsFromState();
 }
 
 function persistAndRender() {
   saveLocalState();
   render();
+}
+
+function toggleTheme() {
+  state.settings.theme = state.settings.theme === "dark" ? "light" : "dark";
+  applyTheme();
+  saveLocalState();
+}
+
+function applyTheme() {
+  const theme = state.settings.theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = theme;
+  elements.themeToggleBtn.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+  elements.themeToggleBtn.setAttribute("aria-pressed", String(theme === "dark"));
 }
 
 function setSyncState(level, message) {
