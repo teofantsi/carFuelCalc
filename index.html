@@ -102,6 +102,14 @@
 
             <div class="chart-grid" id="chartGrid"></div>
             <div id="insightList" class="insight-list"></div>
+
+            <div class="section-heading reports-heading">
+              <div>
+                <p class="eyebrow">Reports</p>
+                <h2>Monthly and yearly breakdowns</h2>
+              </div>
+            </div>
+            <div id="reportGrid" class="report-grid"></div>
           </article>
 
           <article class="card">
@@ -131,6 +139,16 @@
               </div>
               <div id="vehicleLookupSummary" class="lookup-summary" hidden></div>
               <label>
+                Profile MPG (UK)
+                <input
+                  name="profileMpgUk"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="Set manually or use plate lookup"
+                />
+              </label>
+              <label>
                 Vehicle name
                 <input name="name" required placeholder="2018 Ford Fiesta" />
               </label>
@@ -154,7 +172,12 @@
                   <option value="km">Kilometres</option>
                 </select>
               </label>
-              <button type="submit" class="primary-button">Save vehicle</button>
+              <div class="action-row">
+                <button type="submit" class="primary-button">Save vehicle</button>
+                <button id="cancelVehicleEditBtn" type="button" class="ghost-button dark-ghost" hidden>
+                  Cancel edit
+                </button>
+              </div>
             </form>
             <div id="vehicleList" class="list"></div>
           </article>
@@ -181,15 +204,15 @@
               </label>
               <label>
                 Volume (L)
-                <input name="liters" type="number" min="0" step="0.01" required />
+                <input name="liters" type="number" min="0" step="0.01" placeholder="Any two fields fill the third" />
               </label>
               <label>
                 Total cost
-                <input name="totalCost" type="number" min="0" step="0.01" required />
+                <input name="totalCost" type="number" min="0" step="0.01" placeholder="Any two fields fill the third" />
               </label>
               <label>
                 Price per litre
-                <input name="pricePerLiter" type="number" min="0" step="0.001" />
+                <input name="pricePerLiter" type="number" min="0" step="0.001" placeholder="Any two fields fill the third" />
               </label>
               <label>
                 Fuel station
@@ -210,6 +233,9 @@
                   placeholder="Traffic was heavy, tyres adjusted, long motorway drive..."
                 ></textarea>
               </label>
+              <div id="fillUpCalcStatus" class="lookup-status empty wide-field">
+                Enter any two of price per litre, volume, or total cost.
+              </div>
               <button type="submit" class="primary-button">Save fill-up</button>
             </form>
           </article>
@@ -243,13 +269,24 @@
                 <input name="category" placeholder="Commute, holiday, errands..." />
               </label>
               <label>
-                Extra cost
-                <input name="totalCost" type="number" min="0" step="0.01" placeholder="0.00" />
+                Trip MPG (UK)
+                <input name="tripMpgUk" type="number" min="0" step="0.1" placeholder="Pulled from the car profile" />
+              </label>
+              <label>
+                Estimated fuel cost
+                <input name="totalCost" type="number" min="0" step="0.01" readonly />
               </label>
               <label>
                 Fuel used (L)
-                <input name="litersUsed" type="number" min="0" step="0.01" placeholder="Optional" />
+                <input name="litersUsed" type="number" min="0" step="0.01" placeholder="Overrides MPG estimate if entered" />
               </label>
+              <label>
+                Fuel price used
+                <input name="fuelPricePerLiter" type="number" min="0" step="0.001" readonly />
+              </label>
+              <div id="tripCalcStatus" class="lookup-status empty wide-field">
+                Trip fuel cost uses the previous fill-up price for this vehicle.
+              </div>
               <label>
                 Start location
                 <input name="startLocation" placeholder="Home" />

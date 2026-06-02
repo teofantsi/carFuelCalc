@@ -27,6 +27,8 @@ const BACKUP_CSV_COLUMNS = [
   "co2Emissions",
   "estimatedConsumptionLPer100km",
   "estimatedConsumptionMpgUk",
+  "profileMpgUk",
+  "profileMpgSource",
   "lookupSource",
   "odometer",
   "liters",
@@ -40,7 +42,9 @@ const BACKUP_CSV_COLUMNS = [
   "endOdometer",
   "distance",
   "category",
+  "tripMpgUk",
   "litersUsed",
+  "fuelPricePerLiter",
   "startLocation",
   "endLocation",
   "weatherLabel",
@@ -95,19 +99,27 @@ const weatherCodes = {
 let state = loadState();
 let syncInFlight = false;
 let vehicleLookupResult = null;
+let editingVehicleId = "";
+let lastFillUpPricingField = "";
+let lastTripVehicleSelection = "";
+let dashboardFocus = "efficiency";
 
 const elements = {
   statsGrid: document.querySelector("#statsGrid"),
   chartGrid: document.querySelector("#chartGrid"),
   insightList: document.querySelector("#insightList"),
+  reportGrid: document.querySelector("#reportGrid"),
   vehicleForm: document.querySelector("#vehicleForm"),
   vehicleList: document.querySelector("#vehicleList"),
   plateLookupBtn: document.querySelector("#plateLookupBtn"),
   vehicleLookupStatus: document.querySelector("#vehicleLookupStatus"),
   vehicleLookupSummary: document.querySelector("#vehicleLookupSummary"),
+  cancelVehicleEditBtn: document.querySelector("#cancelVehicleEditBtn"),
   fillUpForm: document.querySelector("#fillUpForm"),
+  fillUpCalcStatus: document.querySelector("#fillUpCalcStatus"),
   fillUpTableBody: document.querySelector("#fillUpTableBody"),
   tripForm: document.querySelector("#tripForm"),
+  tripCalcStatus: document.querySelector("#tripCalcStatus"),
   tripTableBody: document.querySelector("#tripTableBody"),
   settingsForm: document.querySelector("#settingsForm"),
   vehicleFilter: document.querySelector("#vehicleFilter"),
@@ -155,13 +167,33 @@ function bindEvents() {
   elements.vehicleForm.addEventListener("submit", handleVehicleSubmit);
   elements.plateLookupBtn.addEventListener("click", () => void handlePlateLookup());
   elements.vehicleForm.registrationNumber.addEventListener("input", handleRegistrationInput);
+  elements.cancelVehicleEditBtn.addEventListener("click", resetVehicleForm);
   elements.fillUpForm.addEventListener("submit", (event) => void handleFillUpSubmit(event));
+  for (const fieldName of ["liters", "totalCost", "pricePerLiter"]) {
+    elements.fillUpForm[fieldName].addEventListener("input", (event) => {
+      lastFillUpPricingField = event.target.name;
+      syncFillUpPricingFields();
+    });
+    elements.fillUpForm[fieldName].addEventListener("change", syncFillUpPricingFields);
+  }
   elements.tripForm.addEventListener("submit", (event) => void handleTripSubmit(event));
+  for (const fieldName of [
+    "vehicleId",
+    "date",
+    "startOdometer",
+    "endOdometer",
+    "tripMpgUk",
+    "litersUsed",
+  ]) {
+    elements.tripForm[fieldName].addEventListener("input", syncTripFormDerivedFields);
+    elements.tripForm[fieldName].addEventListener("change", syncTripFormDerivedFields);
+  }
   elements.settingsForm.addEventListener("submit", handleSettingsSubmit);
   elements.vehicleFilter.addEventListener("change", render);
   elements.exportBtn.addEventListener("click", exportBackup);
   elements.importInput.addEventListener("change", importBackup);
   elements.seedDemoBtn.addEventListener("click", () => void seedDemoData());
+  elements.chartGrid.addEventListener("click", handleDashboardFocusClick);
 }
 
 function loadState() {
@@ -206,8 +238,13 @@ function syncFormsFromState() {
   elements.fillUpForm.date.value = getLocalDateString();
   elements.tripForm.date.value = getLocalDateString();
   elements.profileNickname.value = state.session.nickname || "";
-  elements.vehicleForm.distanceUnit.value = "mi";
-  elements.vehicleForm.fuelType.value = "Petrol";
+  elements.fillUpCalcStatus.textContent =
+    "Enter any two of price per litre, volume, or total cost.";
+  elements.tripCalcStatus.textContent =
+    "Trip fuel cost uses the previous fill-up price for this vehicle.";
+  resetVehicleForm();
+  resetFillUpFormDerivedState();
+  resetTripFormDerivedState();
   resetVehicleLookupUi();
 }
 
@@ -218,9 +255,12 @@ function render() {
   renderStats();
   renderCharts();
   renderInsights();
+  renderReports();
   renderFuelTable();
   renderTripTable();
   updateFormAvailability();
+  syncFillUpPricingFields();
+  syncTripFormDerivedFields();
 }
 
 function renderProfile() {
@@ -293,6 +333,13 @@ function renderVehicleOptions() {
   if (state.vehicles.some((vehicle) => vehicle.id === selectedTripVehicle)) {
     elements.tripForm.vehicleId.value = selectedTripVehicle;
   }
+
+  if (!elements.fillUpForm.vehicleId.value && state.vehicles[0]) {
+    elements.fillUpForm.vehicleId.value = state.vehicles[0].id;
+  }
+  if (!elements.tripForm.vehicleId.value && state.vehicles[0]) {
+    elements.tripForm.vehicleId.value = state.vehicles[0].id;
+  }
 }
 
 function renderVehicleList() {
@@ -310,18 +357,30 @@ function renderVehicleList() {
       const consumptionMeta = describeVehicleConsumption(vehicle);
       return `
         <div class="list-item">
-          <div>
+          <div class="list-item-main">
             <strong>${escapeHtml(vehicle.name)}</strong>
             <span class="meta">${escapeHtml(vehicle.fuelType)} · ${vehicle.distanceUnit.toUpperCase()}${
               vehicle.tankSize ? ` · ${vehicle.tankSize}L tank` : ""
             }${registrationMeta}</span>
             ${consumptionMeta ? `<span class="meta">${escapeHtml(consumptionMeta)}</span>` : ""}
           </div>
-          <span class="chip">${countVehicleEntries(vehicle.id)} fill-ups · ${tripCount} trips</span>
+          <div class="list-item-actions">
+            <span class="chip">${countVehicleEntries(vehicle.id)} fill-ups · ${tripCount} trips</span>
+            <button class="inline-link" data-edit-vehicle="${vehicle.id}" type="button">Edit</button>
+            <button class="danger-link" data-delete-vehicle="${vehicle.id}" type="button">Delete</button>
+          </div>
         </div>
       `;
     })
     .join("");
+
+  for (const button of elements.vehicleList.querySelectorAll("[data-edit-vehicle]")) {
+    button.addEventListener("click", () => startVehicleEdit(button.dataset.editVehicle));
+  }
+
+  for (const button of elements.vehicleList.querySelectorAll("[data-delete-vehicle]")) {
+    button.addEventListener("click", () => void deleteVehicle(button.dataset.deleteVehicle));
+  }
 }
 
 function renderStats() {
@@ -356,12 +415,14 @@ function renderStats() {
     {
       label: "Trip fuel use",
       value: totals.tripEfficiencyLabel,
-      meta: totals.tripLiters ? `${formatNumber(totals.tripLiters, 1)} L logged` : "Optional in trip form",
+      meta: totals.tripLiters
+        ? `${formatNumber(totals.tripLiters, 1)} L logged`
+        : "Derived from trip MPG or liters used",
     },
     {
       label: "Average trip cost",
       value: formatCurrency(totals.averageTripCost),
-      meta: filteredTrips.length ? "Across extra trip costs" : "Add tolls, parking, or fees",
+      meta: filteredTrips.length ? "Estimated fuel cost per trip" : "Trips use the previous fill-up price",
     },
   ];
 
@@ -380,77 +441,81 @@ function renderCharts() {
   const trips = getFilteredTrips();
   const fillUpVehicleUnit = getCurrentFilterUnit(fillUps);
   const tripVehicleUnit = getCurrentFilterUnitFromTrips(trips);
-  const efficiencyValues = fillUps
-    .filter((entry) => Number.isFinite(entry.efficiency))
-    .map((entry) =>
-      normalizeEfficiency(
-        entry.efficiency,
-        getVehicleById(entry.vehicleId)?.distanceUnit || fillUpVehicleUnit
-      )
-    );
-  const priceValues = fillUps
-    .map((entry) => entry.pricePerLiter)
-    .filter((value) => Number.isFinite(value));
-  const monthlySpendSeries = buildMonthlySpendSeries(fillUps, trips);
-  const monthlySpendValues = monthlySpendSeries.map((item) => item.value);
-  const tripDistanceValues = trips
-    .map((trip) => normalizeTripDistance(trip, tripVehicleUnit))
-    .filter((value) => Number.isFinite(value));
+  const chartData = buildDashboardChartData(
+    fillUps,
+    trips,
+    fillUpVehicleUnit,
+    tripVehicleUnit
+  );
+  const availableViews = chartData.filter((chart) => chart.values.length);
+  if (!availableViews.some((chart) => chart.id === dashboardFocus)) {
+    dashboardFocus = availableViews[0]?.id || "efficiency";
+  }
 
-  const chartCards = [
-    renderChartCard(
-      "Efficiency",
-      state.settings.consumptionMode.toUpperCase(),
-      buildEfficiencyMetrics(efficiencyValues),
-      renderLineChart(efficiencyValues, "var(--accent)", {
-        yFormatter: (value) => formatAxisNumber(value, 1),
-        xStartLabel: "Start",
-        xEndLabel: "Now",
-      })
-    ),
-    renderChartCard(
-      "Fuel price trend",
-      "Price per litre",
-      buildPriceMetrics(priceValues),
-      renderLineChart(priceValues, "var(--sky)", {
-        yFormatter: (value) => formatCurrency(value),
-        xStartLabel: "Start",
-        xEndLabel: "Now",
-      })
-    ),
-    renderChartCard(
-      "Monthly spend",
-      "Fuel + trip extras",
-      buildMonthlySpendMetrics(monthlySpendValues),
-      renderBarChart(monthlySpendValues, "var(--sage)", {
-        yFormatter: (value) => formatCurrency(value),
-        xStartLabel: monthlySpendSeries[0]?.label || "Start",
-        xEndLabel: monthlySpendSeries.at(-1)?.label || "Now",
-      })
-    ),
-    renderChartCard(
-      "Trip distance",
-      tripVehicleUnit === "mi" ? "Miles per trip" : "Kilometres per trip",
-      buildTripDistanceMetrics(tripDistanceValues, tripVehicleUnit),
-      renderBarChart(tripDistanceValues, "var(--warn)", {
-        yFormatter: (value) => formatAxisDistance(value, tripVehicleUnit),
-        xStartLabel: "Start",
-        xEndLabel: "Now",
-      })
-    ),
-  ];
+  const heroChart = chartData.find((chart) => chart.id === dashboardFocus) || chartData[0];
+  const monthlySpendChart = chartData.find((chart) => chart.id === "monthlySpend");
+  const priceChart = chartData.find((chart) => chart.id === "price");
 
-  elements.chartGrid.innerHTML = chartCards.join("");
-}
+  elements.chartGrid.innerHTML = `
+    <div class="command-center">
+      <article class="chart-card chart-card-hero">
+        <div class="command-header">
+          <div>
+            <div class="command-label">Option A</div>
+            <h3>${escapeHtml(heroChart.title)}</h3>
+            <div class="chart-meta">${escapeHtml(heroChart.meta)}</div>
+          </div>
+          <div class="chart-switcher" role="tablist" aria-label="Dashboard metric">
+            ${chartData
+              .map(
+                (chart) => `
+                  <button
+                    type="button"
+                    class="chart-switch${chart.id === heroChart.id ? " active" : ""}"
+                    data-chart-focus="${chart.id}"
+                    aria-pressed="${chart.id === heroChart.id ? "true" : "false"}"
+                  >
+                    ${escapeHtml(chart.shortLabel)}
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+        </div>
+        <div class="chart-metrics chart-metrics-hero">${renderChartMetrics(heroChart.metrics)}</div>
+        <div class="chart-surface chart-surface-hero">
+          ${renderHeroChart(heroChart.values, heroChart.color, heroChart.options)}
+        </div>
+      </article>
 
-function renderChartCard(title, meta, metrics, surface) {
-  return `
-    <article class="chart-card">
-      <h3>${escapeHtml(title)}</h3>
-      <div class="chart-meta">${escapeHtml(meta)}</div>
-      <div class="chart-metrics">${renderChartMetrics(metrics)}</div>
-      <div class="chart-surface">${surface}</div>
-    </article>
+      <div class="command-stack">
+        <article class="chart-card chart-card-secondary">
+          <div class="chart-card-head">
+            <div>
+              <h3>${escapeHtml(monthlySpendChart.title)}</h3>
+              <div class="chart-meta">${escapeHtml(monthlySpendChart.meta)}</div>
+            </div>
+            <strong class="chart-highlight">${escapeHtml(monthlySpendChart.highlight)}</strong>
+          </div>
+          <div class="chart-surface chart-surface-compact">
+            ${renderBarChart(monthlySpendChart.values, monthlySpendChart.color, monthlySpendChart.options)}
+          </div>
+        </article>
+
+        <article class="chart-card chart-card-secondary">
+          <div class="chart-card-head">
+            <div>
+              <h3>${escapeHtml(priceChart.title)}</h3>
+              <div class="chart-meta">${escapeHtml(priceChart.meta)}</div>
+            </div>
+            <strong class="chart-highlight">${escapeHtml(priceChart.highlight)}</strong>
+          </div>
+          <div class="chart-surface chart-surface-compact">
+            ${renderLineChart(priceChart.values, priceChart.color, priceChart.options)}
+          </div>
+        </article>
+      </div>
+    </div>
   `;
 }
 
@@ -469,6 +534,88 @@ function renderChartMetrics(metrics) {
       `
     )
     .join("");
+}
+
+function buildDashboardChartData(fillUps, trips, fillUpVehicleUnit, tripVehicleUnit) {
+  const efficiencyValues = fillUps
+    .filter((entry) => Number.isFinite(entry.efficiency))
+    .map((entry) =>
+      normalizeEfficiency(
+        entry.efficiency,
+        getVehicleById(entry.vehicleId)?.distanceUnit || fillUpVehicleUnit
+      )
+    );
+  const priceValues = fillUps
+    .map((entry) => entry.pricePerLiter)
+    .filter((value) => Number.isFinite(value));
+  const monthlySpendSeries = buildMonthlySpendSeries(fillUps, trips);
+  const monthlySpendValues = monthlySpendSeries.map((item) => item.value);
+  const tripDistanceValues = trips
+    .map((trip) => normalizeTripDistance(trip, tripVehicleUnit))
+    .filter((value) => Number.isFinite(value));
+
+  return [
+    {
+      id: "efficiency",
+      shortLabel: "Efficiency",
+      title: "Efficiency trend",
+      meta: state.settings.consumptionMode.toUpperCase(),
+      metrics: buildEfficiencyMetrics(efficiencyValues),
+      values: efficiencyValues,
+      color: "var(--accent)",
+      highlight: buildEfficiencyMetrics(efficiencyValues)[0]?.value || "Pending",
+      options: {
+        yFormatter: (value) => formatAxisNumber(value, 1),
+        xStartLabel: "Start",
+        xEndLabel: "Now",
+      },
+    },
+    {
+      id: "price",
+      shortLabel: "Fuel price",
+      title: "Fuel price trend",
+      meta: "Price per litre",
+      metrics: buildPriceMetrics(priceValues),
+      values: priceValues,
+      color: "var(--sky)",
+      highlight: buildPriceMetrics(priceValues)[0]?.value || "Pending",
+      options: {
+        yFormatter: (value) => formatCurrency(value),
+        xStartLabel: "Start",
+        xEndLabel: "Now",
+      },
+    },
+    {
+      id: "monthlySpend",
+      shortLabel: "Monthly spend",
+      title: "Monthly spend",
+      meta: "Fill-ups + trip fuel",
+      metrics: buildMonthlySpendMetrics(monthlySpendValues),
+      values: monthlySpendValues,
+      color: "var(--sage)",
+      highlight: buildMonthlySpendMetrics(monthlySpendValues)[0]?.value || "Pending",
+      options: {
+        yFormatter: (value) => formatCurrency(value),
+        xStartLabel: monthlySpendSeries[0]?.label || "Start",
+        xEndLabel: monthlySpendSeries.at(-1)?.label || "Now",
+      },
+    },
+    {
+      id: "tripDistance",
+      shortLabel: "Trip distance",
+      title: "Trip distance",
+      meta: tripVehicleUnit === "mi" ? "Miles per trip" : "Kilometres per trip",
+      metrics: buildTripDistanceMetrics(tripDistanceValues, tripVehicleUnit),
+      values: tripDistanceValues,
+      color: "var(--warn)",
+      highlight: buildTripDistanceMetrics(tripDistanceValues, tripVehicleUnit)[0]?.value || "Pending",
+      options: {
+        yFormatter: (value) => formatAxisDistance(value, tripVehicleUnit),
+        xStartLabel: "Start",
+        xEndLabel: "Now",
+      },
+    },
+  ];
 }
 
 function buildEfficiencyMetrics(values) {
@@ -571,6 +718,74 @@ function buildTripDistanceMetrics(values, unit) {
   ];
 }
 
+function handleDashboardFocusClick(event) {
+  const button = event.target.closest("[data-chart-focus]");
+  if (!button) {
+    return;
+  }
+  dashboardFocus = button.dataset.chartFocus || "efficiency";
+  renderCharts();
+}
+
+function renderHeroChart(values, color, options = {}) {
+  if (values.length < 2) {
+    return '<p class="empty">More data will draw this chart.</p>';
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const mid = min + (max - min) / 2;
+  const areaBaseY = 84;
+  const points = values.map((value, index) => {
+    const x = 28 + (index / Math.max(values.length - 1, 1)) * 126;
+    const y = areaBaseY - ((value - min) / Math.max(max - min, 1)) * 58;
+    return { x, y, value };
+  });
+  const linePoints = points.map((point) => `${point.x},${point.y}`).join(" ");
+  const areaPoints = [`${points[0].x},${areaBaseY}`, linePoints, `${points.at(-1).x},${areaBaseY}`].join(" ");
+  const maxPoint = points.reduce((best, point) => (point.value > best.value ? point : best), points[0]);
+  const minPoint = points.reduce((best, point) => (point.value < best.value ? point : best), points[0]);
+  const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
+
+  return `
+    <svg viewBox="0 0 180 120" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      ${renderChartAxes({
+        minLabel: yFormatter(min),
+        midLabel: yFormatter(mid),
+        maxLabel: yFormatter(max),
+        xStartLabel: options.xStartLabel || "1",
+        xEndLabel: options.xEndLabel || String(values.length),
+        width: 180,
+        x1: 28,
+        x2: 154,
+        yBottom: 84,
+        yMid: 56,
+        yTop: 28,
+        textOffset: 4,
+      })}
+      <polygon fill="${color}18" points="${areaPoints}" />
+      <polyline
+        fill="none"
+        stroke="${color}33"
+        stroke-width="10"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        points="${linePoints}"
+      />
+      <polyline
+        fill="none"
+        stroke="${color}"
+        stroke-width="4"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        points="${linePoints}"
+      />
+      ${renderChartPoint(maxPoint, color, "Peak")}
+      ${renderChartPoint(minPoint, color, "Dip")}
+    </svg>
+  `;
+}
+
 function renderLineChart(values, color, options = {}) {
   if (values.length < 2) {
     return '<p class="empty">More data will draw this chart.</p>';
@@ -649,20 +864,335 @@ function renderBarChart(values, color, options = {}) {
   `;
 }
 
-function renderChartAxes({ minLabel, midLabel, maxLabel, xStartLabel, xEndLabel }) {
+function renderChartAxes({
+  minLabel,
+  midLabel,
+  maxLabel,
+  xStartLabel,
+  xEndLabel,
+  width = 160,
+  x1 = 30,
+  x2 = 150,
+  yBottom = 74,
+  yMid = 48,
+  yTop = 22,
+  textOffset = 2,
+}) {
   return `
     <g class="chart-axis-group">
-      <line x1="30" y1="74" x2="150" y2="74" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
-      <line x1="30" y1="48" x2="150" y2="48" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
-      <line x1="30" y1="22" x2="150" y2="22" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
-      <line x1="30" y1="74" x2="150" y2="74" stroke="var(--chart-axis)" stroke-width="1" />
-      <text x="26" y="76" text-anchor="end" class="chart-axis-text">${escapeHtml(minLabel)}</text>
-      <text x="26" y="50" text-anchor="end" class="chart-axis-text">${escapeHtml(midLabel)}</text>
-      <text x="26" y="24" text-anchor="end" class="chart-axis-text">${escapeHtml(maxLabel)}</text>
-      <text x="30" y="92" class="chart-axis-text">${escapeHtml(xStartLabel)}</text>
-      <text x="150" y="92" text-anchor="end" class="chart-axis-text">${escapeHtml(xEndLabel)}</text>
+      <line x1="${x1}" y1="${yBottom}" x2="${x2}" y2="${yBottom}" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="${x1}" y1="${yMid}" x2="${x2}" y2="${yMid}" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="${x1}" y1="${yTop}" x2="${x2}" y2="${yTop}" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="${x1}" y1="${yBottom}" x2="${x2}" y2="${yBottom}" stroke="var(--chart-axis)" stroke-width="1" />
+      <text x="${x1 - textOffset}" y="${yBottom + 2}" text-anchor="end" class="chart-axis-text">${escapeHtml(minLabel)}</text>
+      <text x="${x1 - textOffset}" y="${yMid + 2}" text-anchor="end" class="chart-axis-text">${escapeHtml(midLabel)}</text>
+      <text x="${x1 - textOffset}" y="${yTop + 2}" text-anchor="end" class="chart-axis-text">${escapeHtml(maxLabel)}</text>
+      <text x="${x1}" y="${yBottom + 18}" class="chart-axis-text">${escapeHtml(xStartLabel)}</text>
+      <text x="${Math.min(x2, width - 10)}" y="${yBottom + 18}" text-anchor="end" class="chart-axis-text">${escapeHtml(xEndLabel)}</text>
     </g>
   `;
+}
+
+function renderChartPoint(point, color, label) {
+  return `
+    <g class="chart-point">
+      <circle cx="${point.x}" cy="${point.y}" r="4.5" fill="${color}" />
+      <circle cx="${point.x}" cy="${point.y}" r="8" fill="${color}22" />
+      <text x="${point.x}" y="${Math.max(point.y - 10, 12)}" text-anchor="middle" class="chart-callout">${escapeHtml(label)}</text>
+    </g>
+  `;
+}
+
+function renderReports() {
+  const fillUps = getFilteredFillUps();
+  const trips = getFilteredTrips();
+  const reports = buildReports(fillUps, trips);
+
+  elements.reportGrid.innerHTML = reports
+    .map(
+      (report) => `
+        <article class="report-card${report.emphasis ? " emphasis" : ""}">
+          <div class="report-card-head">
+            <div>
+              <h3>${escapeHtml(report.title)}</h3>
+              <p class="report-summary">${escapeHtml(report.summary)}</p>
+            </div>
+            ${report.badge ? `<span class="report-badge">${escapeHtml(report.badge)}</span>` : ""}
+          </div>
+          <div class="report-metrics">
+            ${report.metrics
+              .map(
+                (metric) => `
+                  <div class="report-metric">
+                    <span class="report-metric-label">${escapeHtml(metric.label)}</span>
+                    <strong class="report-metric-value">${escapeHtml(metric.value)}</strong>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function buildReports(fillUps, trips) {
+  const totals = summarizeEntries(fillUps, trips);
+  const monthSeries = buildMonthlySpendSeries(fillUps, trips, { limit: null });
+  const yearSeries = buildYearlySpendSeries(fillUps, trips);
+  const currentMonth = monthSeries.at(-1);
+  const previousMonth = monthSeries.at(-2);
+  const peakMonth = monthSeries.length
+    ? monthSeries.reduce((best, item) => (item.value > best.value ? item : best), monthSeries[0])
+    : null;
+  const yearlyPeak = yearSeries.length
+    ? yearSeries.reduce((best, item) => (item.totalSpend > best.totalSpend ? item : best), yearSeries[0])
+    : null;
+  const efficiencies = fillUps
+    .filter((entry) => Number.isFinite(entry.efficiency))
+    .map((entry) =>
+      normalizeEfficiency(
+        entry.efficiency,
+        getVehicleById(entry.vehicleId)?.distanceUnit || "km"
+      )
+    );
+  const rollingEfficiency = efficiencies.slice(-3);
+  const tripCategories = summarizeTripCategories(trips);
+  const weatherImpact = summarizeWeatherImpact(fillUps);
+  const vehicleComparison = summarizeVehicleComparison(fillUps, trips);
+  const forecast = projectNextMonthSpend(fillUps, trips);
+  const yearlyFigureSummary = yearSeries.length
+    ? yearSeries.map((item) => `${item.year}: ${formatCurrency(item.totalSpend)}`).join(" · ")
+    : "Yearly figures will appear once more data is logged.";
+
+  return [
+    {
+      title: "Fuel cost report",
+      summary: "How much fuel is costing month to month and across the year.",
+      badge: currentMonth ? `${currentMonth.label}` : "",
+      emphasis: true,
+      metrics: [
+        { label: "This month", value: currentMonth ? formatCurrency(currentMonth.value) : formatCurrency(0) },
+        { label: "This year", value: formatCurrency(yearSeries.at(-1)?.fuelCost || 0) },
+        { label: "Avg fill-up", value: formatCurrency(fillUps.length ? totals.totalFuelCost / fillUps.length : 0) },
+        { label: "Peak month", value: peakMonth ? `${peakMonth.label} · ${formatCurrency(peakMonth.value)}` : "Pending" },
+      ],
+    },
+    {
+      title: "Efficiency report",
+      summary: "Performance trend across recent full tanks, with rolling context.",
+      badge: state.settings.consumptionMode.toUpperCase(),
+      metrics: [
+        { label: "Latest", value: totals.averageEfficiencyLabel === "Pending" ? "Pending" : buildEfficiencyMetrics(efficiencies)[0]?.value || "Pending" },
+        { label: "Rolling avg", value: formatEfficiencyFromNormalized(averageOf(rollingEfficiency), state.settings.consumptionMode) },
+        { label: "Best", value: buildEfficiencyMetrics(efficiencies)[2]?.value || "Pending" },
+        { label: "Worst", value: formatEfficiencyFromNormalized(minOf(efficiencies), state.settings.consumptionMode) },
+      ],
+    },
+    {
+      title: "Trip report",
+      summary: "Distance, trip mix, and estimated fuel cost for driving activity.",
+      badge: `${trips.length} trips`,
+      metrics: [
+        { label: "Year distance", value: formatDistance(yearSeries.at(-1)?.tripDistance || 0, totals.distanceUnit) },
+        { label: "Avg trip", value: formatDistance(totals.averageTripDistance, totals.distanceUnit) },
+        { label: "Longest trip", value: formatDistance(maxOf(trips.map((trip) => normalizeTripDistance(trip, totals.distanceUnit === "mixed" ? "km" : totals.distanceUnit))), totals.distanceUnit) },
+        { label: "Top category", value: tripCategories[0] ? `${tripCategories[0].label} · ${tripCategories[0].count}` : "Pending" },
+      ],
+    },
+    {
+      title: "Vehicle comparison report",
+      summary: "Which vehicle is taking the most spend and which one is performing best.",
+      badge: vehicleComparison.badge,
+      metrics: vehicleComparison.metrics,
+    },
+    {
+      title: "Monthly summary report",
+      summary: "A quick month-over-month view for spend and movement.",
+      badge: monthSeries.length ? `${monthSeries.length} months tracked` : "",
+      metrics: [
+        { label: "Current month", value: currentMonth ? formatCurrency(currentMonth.value) : formatCurrency(0) },
+        { label: "Previous month", value: previousMonth ? formatCurrency(previousMonth.value) : "Pending" },
+        { label: "Change", value: currentMonth && previousMonth ? formatDeltaCurrency(currentMonth.value - previousMonth.value) : "Pending" },
+        { label: "Best month", value: peakMonth ? `${peakMonth.label} · ${formatCurrency(peakMonth.value)}` : "Pending" },
+      ],
+    },
+    {
+      title: "Weather impact report",
+      summary: "Checks whether colder or warmer conditions are lining up with efficiency changes.",
+      badge: weatherImpact.badge,
+      metrics: weatherImpact.metrics,
+    },
+    {
+      title: "Forecast report",
+      summary: "Simple projection based on the most recent spend run-rate.",
+      badge: forecast.badge,
+      metrics: [
+        { label: "Next month", value: formatCurrency(forecast.nextMonth) },
+        { label: "Year run-rate", value: formatCurrency(forecast.yearRunRate) },
+        { label: "Recent 90 days", value: formatCurrency(forecast.recentQuarterSpend) },
+        { label: "Trend", value: forecast.trendLabel },
+      ],
+    },
+    {
+      title: "Yearly figures",
+      summary: yearlyFigureSummary,
+      badge: yearlyPeak ? `${yearlyPeak.year} peak` : "",
+      metrics: buildYearlyFigureMetrics(yearSeries),
+    },
+  ];
+}
+
+function summarizeTripCategories(trips) {
+  const categories = new Map();
+  for (const trip of trips) {
+    const label = trip.category || "Uncategorised";
+    categories.set(label, (categories.get(label) || 0) + 1);
+  }
+  return [...categories.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function summarizeVehicleComparison(fillUps, trips) {
+  const selectedVehicle = elements.vehicleFilter.value;
+  if (selectedVehicle !== "all") {
+    const vehicle = getVehicleById(selectedVehicle);
+    const vehicleFillUps = fillUps.filter((entry) => entry.vehicleId === selectedVehicle);
+    const vehicleTrips = trips.filter((trip) => trip.vehicleId === selectedVehicle);
+    const totals = summarizeEntries(vehicleFillUps, vehicleTrips);
+    return {
+      badge: vehicle?.name || "Vehicle view",
+      metrics: [
+        { label: "Spend", value: formatCurrency(totals.totalSpend) },
+        { label: "Distance", value: formatDistance(totals.tripDistance, totals.distanceUnit) },
+        { label: "Avg efficiency", value: totals.averageEfficiencyLabel },
+        { label: "Fill-ups", value: String(vehicleFillUps.length) },
+      ],
+    };
+  }
+
+  const byVehicle = state.vehicles
+    .map((vehicle) => {
+      const vehicleFillUps = fillUps.filter((entry) => entry.vehicleId === vehicle.id);
+      const vehicleTrips = trips.filter((trip) => trip.vehicleId === vehicle.id);
+      const totals = summarizeEntries(vehicleFillUps, vehicleTrips);
+      return {
+        vehicle,
+        totals,
+        spend: totals.totalSpend,
+        efficiencyScore: totals.averageEfficiencyNormalized || 0,
+      };
+    })
+    .filter((item) => item.spend || item.efficiencyScore);
+
+  const biggestSpend = byVehicle.reduce(
+    (best, item) => (!best || item.spend > best.spend ? item : best),
+    null
+  );
+  const bestEfficiency = byVehicle.reduce(
+    (best, item) => (!best || item.efficiencyScore > best.efficiencyScore ? item : best),
+    null
+  );
+
+  return {
+    badge: `${byVehicle.length || 0} vehicles`,
+    metrics: [
+      { label: "Highest spend", value: biggestSpend ? `${biggestSpend.vehicle.name} · ${formatCurrency(biggestSpend.spend)}` : "Pending" },
+      { label: "Best efficiency", value: bestEfficiency ? `${bestEfficiency.vehicle.name} · ${bestEfficiency.totals.averageEfficiencyLabel}` : "Pending" },
+      { label: "Total garage spend", value: formatCurrency(byVehicle.reduce((sum, item) => sum + item.spend, 0)) },
+      { label: "Tracked vehicles", value: String(byVehicle.length) },
+    ],
+  };
+}
+
+function summarizeWeatherImpact(fillUps) {
+  const entries = fillUps.filter(
+    (entry) => Number.isFinite(entry.efficiency) && Number.isFinite(entry.weather?.tempC)
+  );
+  if (entries.length < 2) {
+    return {
+      badge: "Needs weather data",
+      metrics: [
+        { label: "Cold efficiency", value: "Pending" },
+        { label: "Warm efficiency", value: "Pending" },
+        { label: "Gap", value: "Pending" },
+        { label: "Weather logs", value: String(entries.length) },
+      ],
+    };
+  }
+
+  const cold = entries.filter((entry) => entry.weather.tempC < 10);
+  const warm = entries.filter((entry) => entry.weather.tempC >= 10);
+  const coldAvg = averageOf(
+    cold.map((entry) =>
+      normalizeEfficiency(entry.efficiency, getVehicleById(entry.vehicleId)?.distanceUnit || "km")
+    )
+  );
+  const warmAvg = averageOf(
+    warm.map((entry) =>
+      normalizeEfficiency(entry.efficiency, getVehicleById(entry.vehicleId)?.distanceUnit || "km")
+    )
+  );
+
+  return {
+    badge: `${entries.length} weather-tagged fills`,
+    metrics: [
+      { label: "Cold efficiency", value: formatEfficiencyFromNormalized(coldAvg, state.settings.consumptionMode) },
+      { label: "Warm efficiency", value: formatEfficiencyFromNormalized(warmAvg, state.settings.consumptionMode) },
+      { label: "Gap", value: describeEfficiencyDifference(warmAvg, coldAvg) },
+      { label: "Avg temperature", value: `${formatNumber(averageOf(entries.map((entry) => entry.weather.tempC)), 1)}C` },
+    ],
+  };
+}
+
+function projectNextMonthSpend(fillUps, trips) {
+  const allItems = [...fillUps, ...trips].sort((a, b) => a.date.localeCompare(b.date));
+  if (!allItems.length) {
+    return {
+      badge: "No spend history",
+      nextMonth: 0,
+      yearRunRate: 0,
+      recentQuarterSpend: 0,
+      trendLabel: "Pending",
+    };
+  }
+
+  const lastDate = new Date(allItems.at(-1).date);
+  const cutoff = new Date(lastDate);
+  cutoff.setDate(cutoff.getDate() - 90);
+  const recentItems = allItems.filter((item) => new Date(item.date) >= cutoff);
+  const recentQuarterSpend = recentItems.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+  const nextMonth = recentQuarterSpend / 3 || projectMonthlySpend(fillUps, trips);
+  const monthlyAverage = projectMonthlySpend(fillUps, trips);
+
+  return {
+    badge: recentItems.length ? "Recent spend model" : "Simple monthly projection",
+    nextMonth,
+    yearRunRate: nextMonth * 12,
+    recentQuarterSpend,
+    trendLabel: nextMonth >= monthlyAverage ? "Holding or rising" : "Cooling down",
+  };
+}
+
+function buildYearlyFigureMetrics(yearSeries) {
+  if (!yearSeries.length) {
+    return [
+      { label: "Latest year", value: "Pending" },
+      { label: "Fuel spend", value: "Pending" },
+      { label: "Trip fuel", value: "Pending" },
+      { label: "Distance", value: "Pending" },
+    ];
+  }
+
+  const latest = yearSeries.at(-1);
+  return [
+    { label: "Latest year", value: String(latest.year) },
+    { label: "Fuel spend", value: formatCurrency(latest.fuelCost) },
+    { label: "Trip fuel", value: formatCurrency(latest.tripCost) },
+    { label: "Distance", value: formatDistance(latest.tripDistance, latest.distanceUnit) },
+  ];
 }
 
 function renderInsights() {
@@ -754,8 +1284,8 @@ function renderTripTable() {
           <td><strong>${escapeHtml(vehicle?.name || "Unknown vehicle")}</strong><span class="meta">${escapeHtml(trip.startLocation || "Unknown start")} → ${escapeHtml(trip.endLocation || "Unknown end")}</span></td>
           <td>${formatDistance(trip.distance, vehicle?.distanceUnit || "km")}</td>
           <td>${escapeHtml(trip.category || "Uncategorised")}</td>
-          <td>${formatCurrency(trip.totalCost || 0)}</td>
-          <td>${formatTripEfficiency(trip, vehicle?.distanceUnit || "km")}</td>
+          <td>${formatCurrency(trip.totalCost || 0)}<span class="meta">${escapeHtml(buildTripCostMeta(trip))}</span></td>
+          <td>${formatTripEfficiency(trip, vehicle?.distanceUnit || "km")}<span class="meta">${escapeHtml(buildTripConsumptionMeta(trip))}</span></td>
           <td>${formatWeather(trip.weather)}</td>
           <td><button class="danger-link" data-delete-trip="${trip.id}" type="button">Delete</button></td>
         </tr>
@@ -891,6 +1421,12 @@ function applyLookupToVehicleForm(vehicle) {
   elements.vehicleForm.registrationNumber.value = registrationNumber;
   elements.vehicleForm.fuelType.value = mapFuelTypeForForm(vehicle.fuelType);
   elements.vehicleForm.distanceUnit.value = "mi";
+  if (vehicle.estimatedConsumption?.mpgUk) {
+    elements.vehicleForm.profileMpgUk.value = formatFixedInput(
+      vehicle.estimatedConsumption.mpgUk,
+      1
+    );
+  }
 
   if (shouldReplaceName) {
     elements.vehicleForm.name.value = [year, make].filter(Boolean).join(" ") || registrationNumber;
@@ -940,6 +1476,55 @@ function renderVehicleLookupSummary(vehicle) {
   `;
 }
 
+function resetVehicleForm() {
+  editingVehicleId = "";
+  elements.vehicleForm.reset();
+  elements.vehicleForm.distanceUnit.value = "mi";
+  elements.vehicleForm.fuelType.value = "Petrol";
+  elements.vehicleForm.querySelector('button[type="submit"]').textContent = "Save vehicle";
+  elements.cancelVehicleEditBtn.hidden = true;
+  resetVehicleLookupUi();
+}
+
+function startVehicleEdit(vehicleId) {
+  const vehicle = getVehicleById(vehicleId);
+  if (!vehicle) {
+    return;
+  }
+
+  editingVehicleId = vehicle.id;
+  vehicleLookupResult = vehicle.registrationNumber
+    ? {
+        registrationNumber: vehicle.registrationNumber,
+        fuelType: vehicle.fuelType,
+        make: vehicle.make,
+        yearOfManufacture: vehicle.yearOfManufacture,
+        monthOfFirstRegistration: vehicle.monthOfFirstRegistration,
+        engineCapacity: vehicle.engineCapacity,
+        co2Emissions: vehicle.co2Emissions,
+        estimatedConsumption: vehicle.estimatedConsumption,
+        lookupSource: vehicle.lookupSource,
+      }
+    : null;
+  elements.vehicleForm.registrationNumber.value = formatRegistrationForDisplay(
+    vehicle.registrationNumber
+  );
+  elements.vehicleForm.name.value = vehicle.name;
+  elements.vehicleForm.fuelType.value = vehicle.fuelType;
+  elements.vehicleForm.tankSize.value = vehicle.tankSize ?? "";
+  elements.vehicleForm.distanceUnit.value = vehicle.distanceUnit || "mi";
+  elements.vehicleForm.profileMpgUk.value = vehicle.profileMpgUk ?? "";
+  elements.vehicleForm.querySelector('button[type="submit"]').textContent = "Update vehicle";
+  elements.cancelVehicleEditBtn.hidden = false;
+  renderVehicleLookupSummary(vehicleLookupResult);
+  setVehicleLookupStatus(
+    vehicle.registrationNumber ? "good" : "empty",
+    vehicle.registrationNumber
+      ? "Editing vehicle details. Run plate lookup again if you want to refresh the DVLA estimate."
+      : "Set the vehicle MPG manually, or add a registration plate to estimate it."
+  );
+}
+
 function handleVehicleSubmit(event) {
   event.preventDefault();
   if (!requireProfile()) {
@@ -948,14 +1533,15 @@ function handleVehicleSubmit(event) {
 
   const formData = new FormData(event.currentTarget);
   const registrationNumber = normalizeRegistration(formData.get("registrationNumber"));
+  const profileMpgUk = numberOrNull(formData.get("profileMpgUk"));
   const lookupForVehicle =
     vehicleLookupResult &&
     vehicleLookupResult.registrationNumber === registrationNumber
       ? vehicleLookupResult
       : null;
 
-  state.vehicles.push({
-    id: crypto.randomUUID(),
+  const vehiclePayload = {
+    id: editingVehicleId || crypto.randomUUID(),
     name: formData.get("name").toString().trim(),
     fuelType: formData.get("fuelType").toString(),
     tankSize: numberOrNull(formData.get("tankSize")),
@@ -968,13 +1554,26 @@ function handleVehicleSubmit(event) {
     co2Emissions: lookupForVehicle?.co2Emissions ?? null,
     estimatedConsumption:
       lookupForVehicle?.estimatedConsumption || null,
+    profileMpgUk,
+    profileMpgSource:
+      profileMpgUk === null
+        ? null
+        : lookupForVehicle?.estimatedConsumption &&
+            roundMaybe(lookupForVehicle.estimatedConsumption.mpgUk, 1) === roundMaybe(profileMpgUk, 1)
+          ? "plate"
+          : "manual",
     lookupSource: lookupForVehicle?.lookupSource || null,
-  });
+  };
 
-  event.currentTarget.reset();
-  event.currentTarget.distanceUnit.value = "mi";
-  event.currentTarget.fuelType.value = "Petrol";
-  resetVehicleLookupUi();
+  if (editingVehicleId) {
+    state.vehicles = state.vehicles.map((vehicle) =>
+      vehicle.id === editingVehicleId ? vehiclePayload : vehicle
+    );
+  } else {
+    state.vehicles.push(vehiclePayload);
+  }
+
+  resetVehicleForm();
   persistAndRender();
   void syncRemoteState();
 }
@@ -990,8 +1589,18 @@ async function handleFillUpSubmit(event) {
   }
 
   const formData = new FormData(event.currentTarget);
-  const liters = Number(formData.get("liters"));
-  const totalCost = Number(formData.get("totalCost"));
+  const pricing = resolveFillUpPricing({
+    liters: numberOrNull(formData.get("liters")),
+    totalCost: numberOrNull(formData.get("totalCost")),
+    pricePerLiter: numberOrNull(formData.get("pricePerLiter")),
+  });
+  if (!pricing.isValid) {
+    alert("Enter any two of volume, total cost, and price per litre.");
+    return;
+  }
+
+  const liters = pricing.liters;
+  const totalCost = pricing.totalCost;
   const vehicleId = formData.get("vehicleId").toString();
   const vehicle = getVehicleById(vehicleId);
   const fillUp = {
@@ -1001,7 +1610,7 @@ async function handleFillUpSubmit(event) {
     odometer: Number(formData.get("odometer")),
     liters,
     totalCost,
-    pricePerLiter: numberOrNull(formData.get("pricePerLiter")) ?? totalCost / liters,
+    pricePerLiter: pricing.pricePerLiter,
     station: formData.get("station").toString().trim(),
     isPartial: formData.get("isPartial").toString() === "true",
     notes: formData.get("notes").toString().trim(),
@@ -1017,6 +1626,7 @@ async function handleFillUpSubmit(event) {
   if (vehicle) {
     event.currentTarget.vehicleId.value = vehicle.id;
   }
+  resetFillUpFormDerivedState();
   persistAndRender();
   await syncRemoteState();
   await refreshWeatherSummary();
@@ -1043,6 +1653,23 @@ async function handleTripSubmit(event) {
     return;
   }
 
+  const tripMpgUk = numberOrNull(formData.get("tripMpgUk"));
+  const litersUsed = numberOrNull(formData.get("litersUsed"));
+  const pricePerLiter = numberOrNull(formData.get("fuelPricePerLiter"));
+  const estimatedFuel = estimateTripFuel({
+    vehicle,
+    date: formData.get("date").toString(),
+    startOdometer,
+    distance,
+    tripMpgUk,
+    litersUsed,
+  });
+  const fuelLiters = litersUsed ?? estimatedFuel.estimatedLiters ?? null;
+  const totalCost =
+    Number.isFinite(pricePerLiter) && Number.isFinite(fuelLiters)
+      ? roundMaybe(pricePerLiter * fuelLiters, 2)
+      : 0;
+
   state.trips.push({
     id: crypto.randomUUID(),
     vehicleId,
@@ -1051,8 +1678,10 @@ async function handleTripSubmit(event) {
     endOdometer,
     distance,
     category: formData.get("category").toString().trim(),
-    totalCost: numberOrNull(formData.get("totalCost")) ?? 0,
-    litersUsed: numberOrNull(formData.get("litersUsed")),
+    totalCost,
+    tripMpgUk,
+    litersUsed,
+    fuelPricePerLiter: pricePerLiter,
     startLocation: formData.get("startLocation").toString().trim(),
     endLocation: formData.get("endLocation").toString().trim(),
     notes: formData.get("notes").toString().trim(),
@@ -1064,6 +1693,8 @@ async function handleTripSubmit(event) {
   if (vehicle) {
     event.currentTarget.vehicleId.value = vehicle.id;
   }
+  resetTripFormDerivedState();
+  syncTripFormDerivedFields();
   persistAndRender();
   await syncRemoteState();
 }
@@ -1100,6 +1731,277 @@ async function deleteTrip(entryId) {
   state.trips = state.trips.filter((trip) => trip.id !== entryId);
   persistAndRender();
   await syncRemoteState();
+}
+
+async function deleteVehicle(vehicleId) {
+  const vehicle = getVehicleById(vehicleId);
+  if (!vehicle) {
+    return;
+  }
+
+  const fillUpCount = state.fillUps.filter((entry) => entry.vehicleId === vehicleId).length;
+  const tripCount = state.trips.filter((trip) => trip.vehicleId === vehicleId).length;
+  const confirmed = window.confirm(
+    `Delete ${vehicle.name}? This will also remove ${fillUpCount} fill-ups and ${tripCount} trips linked to it.`
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  state.vehicles = state.vehicles.filter((entry) => entry.id !== vehicleId);
+  state.fillUps = state.fillUps.filter((entry) => entry.vehicleId !== vehicleId);
+  state.trips = state.trips.filter((trip) => trip.vehicleId !== vehicleId);
+  if (editingVehicleId === vehicleId) {
+    resetVehicleForm();
+  }
+  recomputeEfficiencies();
+  persistAndRender();
+  await syncRemoteState();
+}
+
+function resetFillUpFormDerivedState() {
+  lastFillUpPricingField = "";
+  elements.fillUpForm.liters.value = "";
+  elements.fillUpForm.totalCost.value = "";
+  elements.fillUpForm.pricePerLiter.value = "";
+  elements.fillUpCalcStatus.className = "lookup-status empty wide-field";
+  elements.fillUpCalcStatus.textContent =
+    "Enter any two of price per litre, volume, or total cost.";
+}
+
+function syncFillUpPricingFields() {
+  const pricing = resolveFillUpPricing({
+    liters: numberOrNull(elements.fillUpForm.liters.value),
+    totalCost: numberOrNull(elements.fillUpForm.totalCost.value),
+    pricePerLiter: numberOrNull(elements.fillUpForm.pricePerLiter.value),
+  });
+
+  for (const [fieldName, digits] of [
+    ["liters", 2],
+    ["totalCost", 2],
+    ["pricePerLiter", 3],
+  ]) {
+    if (!elements.fillUpForm[fieldName].matches(":focus") && Number.isFinite(pricing[fieldName])) {
+      elements.fillUpForm[fieldName].value = formatFixedInput(pricing[fieldName], digits);
+    }
+  }
+
+  if (pricing.isValid) {
+    elements.fillUpCalcStatus.className = "lookup-status good wide-field";
+    elements.fillUpCalcStatus.innerHTML =
+      `<span class="calc-status-strong">Calculated automatically.</span> ${escapeHtml(pricing.message)}`;
+  } else {
+    elements.fillUpCalcStatus.className = "lookup-status empty wide-field";
+    elements.fillUpCalcStatus.textContent =
+      "Enter any two of price per litre, volume, or total cost.";
+  }
+}
+
+function resolveFillUpPricing({ liters, totalCost, pricePerLiter }) {
+  let resolvedLiters = liters;
+  let resolvedTotalCost = totalCost;
+  let resolvedPricePerLiter = pricePerLiter;
+  const filledCount = [liters, totalCost, pricePerLiter].filter(
+    (value) => Number.isFinite(value) && value > 0
+  ).length;
+
+  if (filledCount < 2) {
+    return {
+      liters: resolvedLiters,
+      totalCost: resolvedTotalCost,
+      pricePerLiter: resolvedPricePerLiter,
+      isValid: false,
+      message: "",
+    };
+  }
+
+  if ((!Number.isFinite(resolvedLiters) || resolvedLiters <= 0) && Number.isFinite(totalCost) && Number.isFinite(pricePerLiter) && pricePerLiter > 0) {
+    resolvedLiters = totalCost / pricePerLiter;
+  } else if ((!Number.isFinite(resolvedTotalCost) || resolvedTotalCost <= 0) && Number.isFinite(liters) && Number.isFinite(pricePerLiter) && pricePerLiter > 0) {
+    resolvedTotalCost = liters * pricePerLiter;
+  } else if ((!Number.isFinite(resolvedPricePerLiter) || resolvedPricePerLiter <= 0) && Number.isFinite(liters) && Number.isFinite(totalCost) && liters > 0) {
+    resolvedPricePerLiter = totalCost / liters;
+  } else if (filledCount === 3 && lastFillUpPricingField) {
+    const otherField = getDerivedFillUpField(lastFillUpPricingField);
+    if (otherField === "liters" && Number.isFinite(totalCost) && Number.isFinite(pricePerLiter) && pricePerLiter > 0) {
+      resolvedLiters = totalCost / pricePerLiter;
+    } else if (otherField === "totalCost" && Number.isFinite(liters) && Number.isFinite(pricePerLiter) && pricePerLiter > 0) {
+      resolvedTotalCost = liters * pricePerLiter;
+    } else if (otherField === "pricePerLiter" && Number.isFinite(liters) && Number.isFinite(totalCost) && liters > 0) {
+      resolvedPricePerLiter = totalCost / liters;
+    }
+  }
+
+  return {
+    liters: roundMaybe(resolvedLiters, 2),
+    totalCost: roundMaybe(resolvedTotalCost, 2),
+    pricePerLiter: roundMaybe(resolvedPricePerLiter, 3),
+    isValid:
+      Number.isFinite(resolvedLiters) &&
+      resolvedLiters > 0 &&
+      Number.isFinite(resolvedTotalCost) &&
+      resolvedTotalCost > 0 &&
+      Number.isFinite(resolvedPricePerLiter) &&
+      resolvedPricePerLiter > 0,
+    message: `${formatCurrency(roundMaybe(resolvedPricePerLiter, 3))}/L × ${formatNumber(roundMaybe(resolvedLiters, 2), 2)} L = ${formatCurrency(roundMaybe(resolvedTotalCost, 2))}.`,
+  };
+}
+
+function getDerivedFillUpField(lastEditedField) {
+  const order = ["liters", "totalCost", "pricePerLiter"];
+  const available = order.filter((field) => field !== lastEditedField);
+  return available.find((field) => !elements.fillUpForm[field].matches(":focus")) || available[0];
+}
+
+function resetTripFormDerivedState() {
+  lastTripVehicleSelection = "";
+  elements.tripForm.tripMpgUk.value = "";
+  elements.tripForm.totalCost.value = "";
+  elements.tripForm.fuelPricePerLiter.value = "";
+  elements.tripCalcStatus.className = "lookup-status empty wide-field";
+  elements.tripCalcStatus.textContent =
+    "Trip fuel cost uses the previous fill-up price for this vehicle.";
+}
+
+function syncTripFormDerivedFields() {
+  const vehicle = getVehicleById(elements.tripForm.vehicleId.value);
+  if (!vehicle) {
+    resetTripFormDerivedState();
+    return;
+  }
+
+  if (
+    !elements.tripForm.tripMpgUk.matches(":focus") &&
+    (vehicle.id !== lastTripVehicleSelection || !numberOrNull(elements.tripForm.tripMpgUk.value))
+  ) {
+    const profileMpgUk = getVehicleProfileMpgUk(vehicle);
+    elements.tripForm.tripMpgUk.value =
+      profileMpgUk !== null ? formatFixedInput(profileMpgUk, 1) : "";
+  }
+  lastTripVehicleSelection = vehicle.id;
+
+  const startOdometer = numberOrNull(elements.tripForm.startOdometer.value);
+  const endOdometer = numberOrNull(elements.tripForm.endOdometer.value);
+  const distance =
+    Number.isFinite(startOdometer) && Number.isFinite(endOdometer)
+      ? endOdometer - startOdometer
+      : null;
+  const tripMpgUk = numberOrNull(elements.tripForm.tripMpgUk.value);
+  const litersUsed = numberOrNull(elements.tripForm.litersUsed.value);
+  const estimate = estimateTripFuel({
+    vehicle,
+    date: elements.tripForm.date.value,
+    startOdometer,
+    distance,
+    tripMpgUk,
+    litersUsed,
+  });
+
+  elements.tripForm.fuelPricePerLiter.value = Number.isFinite(estimate.pricePerLiter)
+    ? formatFixedInput(estimate.pricePerLiter, 3)
+    : "";
+  elements.tripForm.totalCost.value = Number.isFinite(estimate.totalCost)
+    ? formatFixedInput(estimate.totalCost, 2)
+    : "";
+
+  if (estimate.message) {
+    elements.tripCalcStatus.className = `lookup-status ${estimate.level} wide-field`;
+    elements.tripCalcStatus.textContent = estimate.message;
+  } else {
+    elements.tripCalcStatus.className = "lookup-status empty wide-field";
+    elements.tripCalcStatus.textContent =
+      "Trip fuel cost uses the previous fill-up price for this vehicle.";
+  }
+}
+
+function estimateTripFuel({ vehicle, date, startOdometer, distance, tripMpgUk, litersUsed }) {
+  if (!vehicle) {
+    return { estimatedLiters: null, pricePerLiter: null, totalCost: null, level: "empty", message: "" };
+  }
+
+  if (!Number.isFinite(distance) || distance <= 0) {
+    return {
+      estimatedLiters: null,
+      pricePerLiter: null,
+      totalCost: null,
+      level: "empty",
+      message: "Enter the trip distance to estimate fuel cost.",
+    };
+  }
+
+  const previousPrice = getPreviousFillUpPrice(vehicle.id, date, startOdometer);
+  const estimatedLiters = Number.isFinite(litersUsed) && litersUsed > 0
+    ? litersUsed
+    : estimateLitersFromMpg(distance, vehicle.distanceUnit, tripMpgUk);
+
+  if (!Number.isFinite(previousPrice) || previousPrice <= 0) {
+    return {
+      estimatedLiters,
+      pricePerLiter: null,
+      totalCost: null,
+      level: "warn",
+      message: "Add a fill-up price for this car first so trip fuel cost can be calculated.",
+    };
+  }
+
+  if (!Number.isFinite(estimatedLiters) || estimatedLiters <= 0) {
+    return {
+      estimatedLiters: null,
+      pricePerLiter: previousPrice,
+      totalCost: null,
+      level: "warn",
+      message: "Set a car MPG or enter fuel used in litres to estimate this trip cost.",
+    };
+  }
+
+  const totalCost = roundMaybe(previousPrice * estimatedLiters, 2);
+  return {
+    estimatedLiters,
+    pricePerLiter: previousPrice,
+    totalCost,
+    level: "good",
+    message: Number.isFinite(litersUsed) && litersUsed > 0
+      ? `Using ${formatNumber(estimatedLiters, 2)} L at ${formatCurrency(previousPrice)}/L from the previous fill-up.`
+      : `Using ${formatNumber(tripMpgUk, 1)} mpg UK and ${formatCurrency(previousPrice)}/L from the previous fill-up.`,
+  };
+}
+
+function getPreviousFillUpPrice(vehicleId, date, odometer) {
+  const eligible = state.fillUps
+    .filter((entry) => entry.vehicleId === vehicleId)
+    .filter((entry) => {
+      if (!date) {
+        return true;
+      }
+      if (entry.date < date) {
+        return true;
+      }
+      if (entry.date > date) {
+        return false;
+      }
+      return !Number.isFinite(odometer) || entry.odometer <= odometer;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date) || b.odometer - a.odometer);
+  return eligible[0]?.pricePerLiter ?? null;
+}
+
+function getVehicleProfileMpgUk(vehicle) {
+  if (Number.isFinite(vehicle?.profileMpgUk)) {
+    return vehicle.profileMpgUk;
+  }
+  if (Number.isFinite(vehicle?.estimatedConsumption?.mpgUk)) {
+    return vehicle.estimatedConsumption.mpgUk;
+  }
+  return null;
+}
+
+function estimateLitersFromMpg(distance, distanceUnit, mpgUk) {
+  if (!Number.isFinite(distance) || distance <= 0 || !Number.isFinite(mpgUk) || mpgUk <= 0) {
+    return null;
+  }
+
+  const miles = distanceUnit === "mi" ? distance : distance / 1.60934;
+  return roundMaybe((miles / mpgUk) * 4.54609, 2);
 }
 
 function exportBackup() {
@@ -1171,6 +2073,8 @@ function buildBackupCsv() {
       co2Emissions: vehicle.co2Emissions,
       estimatedConsumptionLPer100km: vehicle.estimatedConsumption?.lPer100km,
       estimatedConsumptionMpgUk: vehicle.estimatedConsumption?.mpgUk,
+      profileMpgUk: vehicle.profileMpgUk,
+      profileMpgSource: vehicle.profileMpgSource,
       lookupSource: vehicle.lookupSource,
     })),
     ...state.fillUps.map((entry) => ({
@@ -1202,7 +2106,9 @@ function buildBackupCsv() {
       distance: trip.distance,
       category: trip.category,
       totalCost: trip.totalCost,
+      tripMpgUk: trip.tripMpgUk,
       litersUsed: trip.litersUsed,
+      fuelPricePerLiter: trip.fuelPricePerLiter,
       startLocation: trip.startLocation,
       endLocation: trip.endLocation,
       notes: trip.notes,
@@ -1265,6 +2171,8 @@ function importRoadLedgerRows(rows) {
           engineCapacity: parseNullableNumber(row.engineCapacity),
           co2Emissions: parseNullableNumber(row.co2Emissions),
           estimatedConsumption: buildEstimatedConsumption(row),
+          profileMpgUk: parseNullableNumber(row.profileMpgUk),
+          profileMpgSource: row.profileMpgSource || null,
           lookupSource: row.lookupSource || null,
         });
         break;
@@ -1303,7 +2211,9 @@ function importRoadLedgerRows(rows) {
             distance: importedDistance ?? Math.max(endOdometer - startOdometer, 0),
             category: row.category || "",
             totalCost: parseNumberOrZero(row.totalCost),
+            tripMpgUk: parseNullableNumber(row.tripMpgUk),
             litersUsed: parseNullableNumber(row.litersUsed),
+            fuelPricePerLiter: parseNullableNumber(row.fuelPricePerLiter),
             startLocation: row.startLocation || "",
             endLocation: row.endLocation || "",
             notes: row.notes || "",
@@ -1353,6 +2263,8 @@ function importFuelioCsv(csvText) {
       engineCapacity: null,
       co2Emissions: null,
       estimatedConsumption: null,
+      profileMpgUk: null,
+      profileMpgSource: null,
       lookupSource: "fuelio",
     };
   });
@@ -1617,6 +2529,19 @@ async function seedDemoData() {
       fuelType: "Petrol",
       tankSize: 42,
       distanceUnit: "mi",
+      registrationNumber: "AB12CDE",
+      make: "FORD",
+      yearOfManufacture: 2018,
+      monthOfFirstRegistration: "2018-03",
+      engineCapacity: 998,
+      co2Emissions: 114,
+      estimatedConsumption: {
+        lPer100km: 6.1,
+        mpgUk: 46.5,
+      },
+      profileMpgUk: 44.2,
+      profileMpgSource: "manual",
+      lookupSource: "demo",
     },
   ];
   state.fillUps = [
@@ -1634,9 +2559,9 @@ async function seedDemoData() {
     }),
   ];
   state.trips = [
-    makeDemoTrip(vehicleId, "2026-05-06", 24038, 24116, "Commute", 0, 5.3, "Home", "Canary Wharf"),
-    makeDemoTrip(vehicleId, "2026-05-18", 24401, 24574, "Weekend", 8.5, 11.2, "London", "Brighton"),
-    makeDemoTrip(vehicleId, "2026-05-29", 24782, 24864, "Errands", 4.2, 4.6, "Home", "Westfield"),
+    makeDemoTrip(vehicleId, "2026-05-06", 24038, 24116, "Commute", 44.2, 5.3, 1.51, "Home", "Canary Wharf"),
+    makeDemoTrip(vehicleId, "2026-05-18", 24401, 24574, "Weekend", 44.2, 11.2, 1.51, "London", "Brighton"),
+    makeDemoTrip(vehicleId, "2026-05-29", 24782, 24864, "Errands", 44.2, 4.6, 1.53, "Home", "Westfield"),
   ];
 
   recomputeEfficiencies();
@@ -1661,7 +2586,21 @@ function makeDemoFillUp(vehicleId, date, odometer, liters, totalCost, station, i
   };
 }
 
-function makeDemoTrip(vehicleId, date, startOdometer, endOdometer, category, totalCost, litersUsed, startLocation, endLocation) {
+function makeDemoTrip(
+  vehicleId,
+  date,
+  startOdometer,
+  endOdometer,
+  category,
+  tripMpgUk,
+  litersUsed,
+  fuelPricePerLiter,
+  startLocation,
+  endLocation
+) {
+  const totalCost = Number.isFinite(litersUsed) && Number.isFinite(fuelPricePerLiter)
+    ? roundMaybe(litersUsed * fuelPricePerLiter, 2)
+    : 0;
   return {
     id: crypto.randomUUID(),
     vehicleId,
@@ -1671,7 +2610,9 @@ function makeDemoTrip(vehicleId, date, startOdometer, endOdometer, category, tot
     distance: endOdometer - startOdometer,
     category,
     totalCost,
+    tripMpgUk,
     litersUsed,
+    fuelPricePerLiter,
     startLocation,
     endLocation,
     notes: "",
@@ -1715,7 +2656,10 @@ function summarizeEntries(fillUps, trips) {
   const totalFuelCost = fillUps.reduce((sum, entry) => sum + entry.totalCost, 0);
   const totalTripCost = trips.reduce((sum, trip) => sum + (trip.totalCost || 0), 0);
   const totalLiters = fillUps.reduce((sum, entry) => sum + entry.liters, 0);
-  const tripLiters = trips.reduce((sum, trip) => sum + (trip.litersUsed || 0), 0);
+  const tripFuelSeries = trips
+    .map((trip) => getTripFuelLiters(trip))
+    .filter((value) => Number.isFinite(value));
+  const tripLiters = tripFuelSeries.reduce((sum, value) => sum + value, 0);
   const efficiencies = fillUps.filter((entry) => Number.isFinite(entry.efficiency));
   const averageEfficiency = efficiencies.length
     ? efficiencies.reduce((sum, entry) => {
@@ -1747,13 +2691,14 @@ function summarizeEntries(fillUps, trips) {
   const averageTripDistance = trips.length ? tripDistance / trips.length : 0;
   const tripKmPerLiter = tripLiters
     ? trips.reduce((sum, trip) => {
-        if (!trip.litersUsed) {
+        const tripFuelLiters = getTripFuelLiters(trip);
+        if (!Number.isFinite(tripFuelLiters) || tripFuelLiters <= 0) {
           return sum;
         }
         const unit = getVehicleById(trip.vehicleId)?.distanceUnit || "km";
-        return sum + normalizeEfficiency(trip.distance / trip.litersUsed, unit);
+        return sum + normalizeEfficiency(trip.distance / tripFuelLiters, unit);
       }, 0) /
-      trips.filter((trip) => trip.litersUsed).length
+      tripFuelSeries.length
     : null;
 
   return {
@@ -1766,6 +2711,8 @@ function summarizeEntries(fillUps, trips) {
     tripDistance,
     averageTripDistance,
     distanceUnit,
+    averageEfficiencyNormalized: averageEfficiency,
+    bestEfficiencyNormalized: bestEfficiency,
     averageEfficiencyLabel: formatEfficiencyFromNormalized(
       averageEfficiency,
       state.settings.consumptionMode
@@ -1796,16 +2743,55 @@ function projectMonthlySpend(fillUps, trips) {
   return (total / days) * 30;
 }
 
-function buildMonthlySpendSeries(fillUps, trips) {
+function buildMonthlySpendSeries(fillUps, trips, options = {}) {
   const bucket = new Map();
   for (const item of [...fillUps, ...trips]) {
     const month = item.date.slice(0, 7);
     bucket.set(month, (bucket.get(month) || 0) + (item.totalCost || 0));
   }
+  const limit = options.limit === undefined ? 8 : options.limit;
+  const series = [...bucket.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([month, value]) => ({ label: formatMonthLabel(month), value }));
+  return limit ? series.slice(-limit) : series;
+}
+
+function buildYearlySpendSeries(fillUps, trips) {
+  const bucket = new Map();
+
+  for (const entry of fillUps) {
+    const year = entry.date.slice(0, 4);
+    const record = bucket.get(year) || makeYearBucket();
+    record.fuelCost += entry.totalCost || 0;
+    record.totalSpend += entry.totalCost || 0;
+    record.totalLiters += entry.liters || 0;
+    bucket.set(year, record);
+  }
+
+  for (const trip of trips) {
+    const year = trip.date.slice(0, 4);
+    const record = bucket.get(year) || makeYearBucket();
+    record.tripCost += trip.totalCost || 0;
+    record.totalSpend += trip.totalCost || 0;
+    const normalizedDistance = normalizeTripDistance(trip, record.distanceUnit);
+    record.tripDistance += normalizedDistance || 0;
+    bucket.set(year, record);
+  }
+
   return [...bucket.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-8)
-    .map(([month, value]) => ({ label: formatMonthLabel(month), value }));
+    .map(([year, totals]) => ({ year, ...totals }));
+}
+
+function makeYearBucket() {
+  return {
+    fuelCost: 0,
+    tripCost: 0,
+    totalSpend: 0,
+    totalLiters: 0,
+    tripDistance: 0,
+    distanceUnit: getGarageDistanceUnit(),
+  };
 }
 
 function getFilteredFillUps() {
@@ -1827,6 +2813,11 @@ function getFilteredTrips() {
 
 function getVehicleById(vehicleId) {
   return state.vehicles.find((vehicle) => vehicle.id === vehicleId);
+}
+
+function getGarageDistanceUnit() {
+  const units = new Set(state.vehicles.map((vehicle) => vehicle.distanceUnit || "km"));
+  return units.size === 1 ? [...units][0] : "km";
 }
 
 function countVehicleEntries(vehicleId) {
@@ -1852,21 +2843,61 @@ function computeEntryMetrics(entry, vehicle) {
 }
 
 function formatTripEfficiency(trip, vehicleUnit) {
-  if (!trip.litersUsed || trip.litersUsed <= 0) {
+  const tripFuelLiters = getTripFuelLiters(trip);
+  if (!tripFuelLiters || tripFuelLiters <= 0) {
     return "Optional";
   }
   return formatEfficiency(
-    trip.distance / trip.litersUsed,
+    trip.distance / tripFuelLiters,
     state.settings.consumptionMode,
     vehicleUnit
   );
 }
 
 function describeVehicleConsumption(vehicle) {
-  if (!vehicle?.estimatedConsumption) {
-    return "";
+  const profileMpgUk = getVehicleProfileMpgUk(vehicle);
+  const parts = [];
+  if (Number.isFinite(profileMpgUk)) {
+    parts.push(
+      `${vehicle.profileMpgSource === "plate" ? "Profile via plate" : "Profile"} ${profileMpgUk.toFixed(1)} mpg UK`
+    );
   }
-  return `Estimated ${vehicle.estimatedConsumption.lPer100km.toFixed(1)} L/100km · ${vehicle.estimatedConsumption.mpgUk.toFixed(1)} mpg UK`;
+  if (!vehicle?.estimatedConsumption) {
+    return parts.join(" · ");
+  }
+  parts.push(
+    `Estimated ${vehicle.estimatedConsumption.lPer100km.toFixed(1)} L/100km · ${vehicle.estimatedConsumption.mpgUk.toFixed(1)} mpg UK`
+  );
+  return parts.join(" · ");
+}
+
+function getTripFuelLiters(trip) {
+  if (Number.isFinite(trip.litersUsed) && trip.litersUsed > 0) {
+    return trip.litersUsed;
+  }
+  const vehicle = getVehicleById(trip.vehicleId);
+  return estimateLitersFromMpg(
+    trip.distance,
+    vehicle?.distanceUnit || "km",
+    trip.tripMpgUk ?? getVehicleProfileMpgUk(vehicle)
+  );
+}
+
+function buildTripConsumptionMeta(trip) {
+  if (Number.isFinite(trip.litersUsed) && trip.litersUsed > 0) {
+    return `${formatNumber(trip.litersUsed, 2)} L used`;
+  }
+  if (Number.isFinite(trip.tripMpgUk) && trip.tripMpgUk > 0) {
+    return `${formatNumber(trip.tripMpgUk, 1)} mpg UK profile`;
+  }
+  return "No MPG or litres saved";
+}
+
+function buildTripCostMeta(trip) {
+  if (Number.isFinite(trip.fuelPricePerLiter) && trip.fuelPricePerLiter > 0) {
+    return `${formatCurrency(trip.fuelPricePerLiter)}/L applied`;
+  }
+  return "No fuel price matched";
 }
 
 function normalizeRegistration(value) {
@@ -1917,6 +2948,28 @@ function formatCurrency(amount) {
 
 function formatNumber(value, digits = 1) {
   return Number(value || 0).toFixed(digits);
+}
+
+function formatFixedInput(value, digits = 1) {
+  return Number.isFinite(value) ? Number(value).toFixed(digits) : "";
+}
+
+function averageOf(values) {
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  if (!finiteValues.length) {
+    return null;
+  }
+  return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+}
+
+function maxOf(values) {
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  return finiteValues.length ? Math.max(...finiteValues) : null;
+}
+
+function minOf(values) {
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  return finiteValues.length ? Math.min(...finiteValues) : null;
 }
 
 function formatDistance(value, unit) {
@@ -1976,6 +3029,22 @@ function formatWeather(weather) {
     parts.push(`${weather.tempC}C`);
   }
   return parts.join(" · ") || "Unavailable";
+}
+
+function formatDeltaCurrency(value) {
+  if (!Number.isFinite(value)) {
+    return "Pending";
+  }
+  return `${value >= 0 ? "+" : "-"}${formatCurrency(Math.abs(value))}`;
+}
+
+function describeEfficiencyDifference(a, b) {
+  if (!Number.isFinite(a) || !Number.isFinite(b)) {
+    return "Pending";
+  }
+  const change = ((a - b) / b) * 100;
+  const direction = change >= 0 ? "better" : "lower";
+  return `${formatNumber(Math.abs(change), 0)}% ${direction} warm`;
 }
 
 async function refreshWeatherSummary() {
