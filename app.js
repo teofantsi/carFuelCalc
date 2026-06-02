@@ -704,6 +704,10 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
         yFormatter: (value) => formatCurrency(value),
         xStartLabel: "Start",
         xEndLabel: "Now",
+        yDomain: buildReactiveRange(priceValues, {
+          paddingRatio: 0.08,
+          minimumPadding: 0.005,
+        }),
       },
     },
     {
@@ -911,8 +915,9 @@ function renderLineChart(values, color, options = {}) {
     return '<p class="empty">More data will draw this chart.</p>';
   }
 
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const domain = options.yDomain || {};
+  const min = Number.isFinite(domain.min) ? domain.min : Math.min(...values);
+  const max = Number.isFinite(domain.max) ? domain.max : Math.max(...values);
   const mid = min + (max - min) / 2;
   const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
   const points = values
@@ -3815,6 +3820,33 @@ function formatAxisNumber(value, digits = 1) {
 
 function formatAxisDistance(value, unit) {
   return `${formatAxisNumber(value, value >= 100 ? 0 : 1)} ${unit}`;
+}
+
+function buildReactiveRange(values, options = {}) {
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  if (!finiteValues.length) {
+    return null;
+  }
+
+  const rawMin = Math.min(...finiteValues);
+  const rawMax = Math.max(...finiteValues);
+  const rawRange = rawMax - rawMin;
+  const padding = Math.max(
+    rawRange * (options.paddingRatio ?? 0),
+    options.minimumPadding ?? 0
+  );
+
+  if (!rawRange) {
+    return {
+      min: Math.max(0, rawMin - padding),
+      max: rawMax + padding,
+    };
+  }
+
+  return {
+    min: Math.max(0, rawMin - padding),
+    max: rawMax + padding,
+  };
 }
 
 function roundMaybe(value, digits) {
