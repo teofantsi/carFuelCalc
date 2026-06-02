@@ -160,6 +160,14 @@ const elements = {
   settingsCard: document.querySelector("#settingsCard"),
 };
 
+function getFormField(form, name) {
+  return form?.elements?.namedItem(name);
+}
+
+function getSubmitButton(form) {
+  return form?.querySelector('button[type="submit"]');
+}
+
 void init();
 
 async function init() {
@@ -199,15 +207,21 @@ function bindEvents() {
   }
   elements.vehicleForm.addEventListener("submit", handleVehicleSubmit);
   elements.plateLookupBtn.addEventListener("click", () => void handlePlateLookup());
-  elements.vehicleForm.registrationNumber.addEventListener("input", handleRegistrationInput);
+  getFormField(elements.vehicleForm, "registrationNumber").addEventListener(
+    "input",
+    handleRegistrationInput
+  );
   elements.cancelVehicleEditBtn.addEventListener("click", resetVehicleForm);
   elements.fillUpForm.addEventListener("submit", (event) => void handleFillUpSubmit(event));
   for (const fieldName of ["liters", "totalCost", "pricePerLiter"]) {
-    elements.fillUpForm[fieldName].addEventListener("input", (event) => {
+    getFormField(elements.fillUpForm, fieldName).addEventListener("input", (event) => {
       lastFillUpPricingField = event.target.name;
       syncFillUpPricingFields();
     });
-    elements.fillUpForm[fieldName].addEventListener("change", syncFillUpPricingFields);
+    getFormField(elements.fillUpForm, fieldName).addEventListener(
+      "change",
+      syncFillUpPricingFields
+    );
   }
   elements.tripForm.addEventListener("submit", (event) => void handleTripSubmit(event));
   elements.ownershipCostForm.addEventListener("submit", (event) =>
@@ -221,8 +235,14 @@ function bindEvents() {
     "tripMpgUk",
     "litersUsed",
   ]) {
-    elements.tripForm[fieldName].addEventListener("input", syncTripFormDerivedFields);
-    elements.tripForm[fieldName].addEventListener("change", syncTripFormDerivedFields);
+    getFormField(elements.tripForm, fieldName).addEventListener(
+      "input",
+      syncTripFormDerivedFields
+    );
+    getFormField(elements.tripForm, fieldName).addEventListener(
+      "change",
+      syncTripFormDerivedFields
+    );
   }
   elements.settingsForm.addEventListener("submit", handleSettingsSubmit);
   elements.vehicleFilter.addEventListener("change", render);
@@ -268,14 +288,15 @@ function saveLocalState() {
 }
 
 function syncFormsFromState() {
-  elements.settingsForm.currency.value = state.settings.currency;
-  elements.settingsForm.homeCity.value = state.settings.homeCity;
-  elements.settingsForm.countryCode.value = state.settings.countryCode;
-  elements.settingsForm.consumptionMode.value = state.settings.consumptionMode;
-  elements.fillUpForm.date.value = getLocalDateString();
-  elements.tripForm.date.value = getLocalDateString();
-  elements.ownershipCostForm.date.value = getLocalDateString();
-  elements.ownershipCostForm.category.value = "service";
+  getFormField(elements.settingsForm, "currency").value = state.settings.currency;
+  getFormField(elements.settingsForm, "homeCity").value = state.settings.homeCity;
+  getFormField(elements.settingsForm, "countryCode").value = state.settings.countryCode;
+  getFormField(elements.settingsForm, "consumptionMode").value =
+    state.settings.consumptionMode;
+  getFormField(elements.fillUpForm, "date").value = getLocalDateString();
+  getFormField(elements.tripForm, "date").value = getLocalDateString();
+  getFormField(elements.ownershipCostForm, "date").value = getLocalDateString();
+  getFormField(elements.ownershipCostForm, "category").value = "service";
   elements.profileNickname.value = state.session.nickname || "";
   elements.fillUpCalcStatus.textContent =
     "Enter any two of price per litre, volume, or total cost.";
@@ -341,9 +362,10 @@ function renderProfile() {
 
 function renderVehicleOptions() {
   const selectedFilter = elements.vehicleFilter.value || "all";
-  const selectedFuelVehicle = elements.fillUpForm.vehicleId?.value || "";
-  const selectedTripVehicle = elements.tripForm.vehicleId?.value || "";
-  const selectedOwnershipVehicle = elements.ownershipCostForm.vehicleId?.value || "";
+  const selectedFuelVehicle = getFormField(elements.fillUpForm, "vehicleId")?.value || "";
+  const selectedTripVehicle = getFormField(elements.tripForm, "vehicleId")?.value || "";
+  const selectedOwnershipVehicle =
+    getFormField(elements.ownershipCostForm, "vehicleId")?.value || "";
   const filterOptions = ['<option value="all">All vehicles</option>']
     .concat(
       state.vehicles.map(
@@ -366,31 +388,35 @@ function renderVehicleOptions() {
     ? selectedFilter
     : "all";
 
-  elements.fillUpForm.vehicleId.innerHTML =
+  getFormField(elements.fillUpForm, "vehicleId").innerHTML =
     vehicleOptions || '<option value="">Add a vehicle first</option>';
-  elements.tripForm.vehicleId.innerHTML =
+  getFormField(elements.tripForm, "vehicleId").innerHTML =
     vehicleOptions || '<option value="">Add a vehicle first</option>';
-  elements.ownershipCostForm.vehicleId.innerHTML =
+  getFormField(elements.ownershipCostForm, "vehicleId").innerHTML =
     vehicleOptions || '<option value="">Add a vehicle first</option>';
 
   if (state.vehicles.some((vehicle) => vehicle.id === selectedFuelVehicle)) {
-    elements.fillUpForm.vehicleId.value = selectedFuelVehicle;
+    getFormField(elements.fillUpForm, "vehicleId").value = selectedFuelVehicle;
   }
   if (state.vehicles.some((vehicle) => vehicle.id === selectedTripVehicle)) {
-    elements.tripForm.vehicleId.value = selectedTripVehicle;
+    getFormField(elements.tripForm, "vehicleId").value = selectedTripVehicle;
   }
   if (state.vehicles.some((vehicle) => vehicle.id === selectedOwnershipVehicle)) {
-    elements.ownershipCostForm.vehicleId.value = selectedOwnershipVehicle;
+    getFormField(elements.ownershipCostForm, "vehicleId").value =
+      selectedOwnershipVehicle;
   }
 
-  if (!elements.fillUpForm.vehicleId.value && state.vehicles[0]) {
-    elements.fillUpForm.vehicleId.value = state.vehicles[0].id;
+  if (!getFormField(elements.fillUpForm, "vehicleId").value && state.vehicles[0]) {
+    getFormField(elements.fillUpForm, "vehicleId").value = state.vehicles[0].id;
   }
-  if (!elements.tripForm.vehicleId.value && state.vehicles[0]) {
-    elements.tripForm.vehicleId.value = state.vehicles[0].id;
+  if (!getFormField(elements.tripForm, "vehicleId").value && state.vehicles[0]) {
+    getFormField(elements.tripForm, "vehicleId").value = state.vehicles[0].id;
   }
-  if (!elements.ownershipCostForm.vehicleId.value && state.vehicles[0]) {
-    elements.ownershipCostForm.vehicleId.value = state.vehicles[0].id;
+  if (
+    !getFormField(elements.ownershipCostForm, "vehicleId").value &&
+    state.vehicles[0]
+  ) {
+    getFormField(elements.ownershipCostForm, "vehicleId").value = state.vehicles[0].id;
   }
 }
 
@@ -1680,7 +1706,7 @@ async function handlePlateLookup() {
   }
 
   const registrationNumber = normalizeRegistration(
-    elements.vehicleForm.registrationNumber.value
+    getFormField(elements.vehicleForm, "registrationNumber").value
   );
   if (!registrationNumber) {
     setVehicleLookupStatus("warn", "Enter a UK number plate before looking it up.");
@@ -1716,28 +1742,29 @@ function applyLookupToVehicleForm(vehicle) {
   const registrationNumber = formatRegistrationForDisplay(vehicle.registrationNumber);
   const year = vehicle.yearOfManufacture || vehicle.monthOfFirstRegistration?.slice(0, 4) || "";
   const make = toTitleCase(vehicle.make || "");
-  const currentName = elements.vehicleForm.name.value.trim();
+  const currentName = getFormField(elements.vehicleForm, "name").value.trim();
   const shouldReplaceName =
-    !currentName || currentName === elements.vehicleForm.name.defaultValue;
+    !currentName || currentName === getFormField(elements.vehicleForm, "name").defaultValue;
 
-  elements.vehicleForm.registrationNumber.value = registrationNumber;
-  elements.vehicleForm.fuelType.value = mapFuelTypeForForm(vehicle.fuelType);
-  elements.vehicleForm.distanceUnit.value = "mi";
+  getFormField(elements.vehicleForm, "registrationNumber").value = registrationNumber;
+  getFormField(elements.vehicleForm, "fuelType").value = mapFuelTypeForForm(vehicle.fuelType);
+  getFormField(elements.vehicleForm, "distanceUnit").value = "mi";
   if (vehicle.estimatedConsumption?.mpgUk) {
-    elements.vehicleForm.profileMpgUk.value = formatFixedInput(
+    getFormField(elements.vehicleForm, "profileMpgUk").value = formatFixedInput(
       vehicle.estimatedConsumption.mpgUk,
       1
     );
   }
 
   if (shouldReplaceName) {
-    elements.vehicleForm.name.value = [year, make].filter(Boolean).join(" ") || registrationNumber;
+    getFormField(elements.vehicleForm, "name").value =
+      [year, make].filter(Boolean).join(" ") || registrationNumber;
   }
 }
 
 function resetVehicleLookupUi() {
   vehicleLookupResult = null;
-  elements.vehicleForm.registrationNumber.value = "";
+  getFormField(elements.vehicleForm, "registrationNumber").value = "";
   setVehicleLookupStatus(
     "empty",
     "Enter a UK number plate to prefill fuel type and estimate consumption."
@@ -1781,9 +1808,9 @@ function renderVehicleLookupSummary(vehicle) {
 function resetVehicleForm() {
   editingVehicleId = "";
   elements.vehicleForm.reset();
-  elements.vehicleForm.distanceUnit.value = "mi";
-  elements.vehicleForm.fuelType.value = "Petrol";
-  elements.vehicleForm.querySelector('button[type="submit"]').textContent = "Save vehicle";
+  getFormField(elements.vehicleForm, "distanceUnit").value = "mi";
+  getFormField(elements.vehicleForm, "fuelType").value = "Petrol";
+  getSubmitButton(elements.vehicleForm).textContent = "Save vehicle";
   elements.cancelVehicleEditBtn.hidden = true;
   resetVehicleLookupUi();
 }
@@ -1809,15 +1836,15 @@ function startVehicleEdit(vehicleId) {
         lookupSource: vehicle.lookupSource,
       }
     : null;
-  elements.vehicleForm.registrationNumber.value = formatRegistrationForDisplay(
+  getFormField(elements.vehicleForm, "registrationNumber").value = formatRegistrationForDisplay(
     vehicle.registrationNumber
   );
-  elements.vehicleForm.name.value = vehicle.name;
-  elements.vehicleForm.fuelType.value = vehicle.fuelType;
-  elements.vehicleForm.tankSize.value = vehicle.tankSize ?? "";
-  elements.vehicleForm.distanceUnit.value = vehicle.distanceUnit || "mi";
-  elements.vehicleForm.profileMpgUk.value = vehicle.profileMpgUk ?? "";
-  elements.vehicleForm.querySelector('button[type="submit"]').textContent = "Update vehicle";
+  getFormField(elements.vehicleForm, "name").value = vehicle.name;
+  getFormField(elements.vehicleForm, "fuelType").value = vehicle.fuelType;
+  getFormField(elements.vehicleForm, "tankSize").value = vehicle.tankSize ?? "";
+  getFormField(elements.vehicleForm, "distanceUnit").value = vehicle.distanceUnit || "mi";
+  getFormField(elements.vehicleForm, "profileMpgUk").value = vehicle.profileMpgUk ?? "";
+  getSubmitButton(elements.vehicleForm).textContent = "Update vehicle";
   elements.cancelVehicleEditBtn.hidden = false;
   renderVehicleLookupSummary(vehicleLookupResult);
   setVehicleLookupStatus(
@@ -1926,9 +1953,9 @@ async function handleFillUpSubmit(event) {
   recomputeEfficiencies();
 
   event.currentTarget.reset();
-  event.currentTarget.date.value = getLocalDateString();
+  getFormField(event.currentTarget, "date").value = getLocalDateString();
   if (vehicle) {
-    event.currentTarget.vehicleId.value = vehicle.id;
+    getFormField(event.currentTarget, "vehicleId").value = vehicle.id;
   }
   resetFillUpFormDerivedState();
   persistAndRender();
@@ -1993,9 +2020,9 @@ async function handleTripSubmit(event) {
   });
 
   event.currentTarget.reset();
-  event.currentTarget.date.value = getLocalDateString();
+  getFormField(event.currentTarget, "date").value = getLocalDateString();
   if (vehicle) {
-    event.currentTarget.vehicleId.value = vehicle.id;
+    getFormField(event.currentTarget, "vehicleId").value = vehicle.id;
   }
   resetTripFormDerivedState();
   syncTripFormDerivedFields();
@@ -2027,10 +2054,10 @@ async function handleOwnershipCostSubmit(event) {
   });
 
   event.currentTarget.reset();
-  event.currentTarget.date.value = getLocalDateString();
-  event.currentTarget.category.value = "service";
+  getFormField(event.currentTarget, "date").value = getLocalDateString();
+  getFormField(event.currentTarget, "category").value = "service";
   if (vehicle) {
-    event.currentTarget.vehicleId.value = vehicle.id;
+    getFormField(event.currentTarget, "vehicleId").value = vehicle.id;
   }
   persistAndRender();
   await syncRemoteState();
@@ -2107,9 +2134,9 @@ async function deleteVehicle(vehicleId) {
 
 function resetFillUpFormDerivedState() {
   lastFillUpPricingField = "";
-  elements.fillUpForm.liters.value = "";
-  elements.fillUpForm.totalCost.value = "";
-  elements.fillUpForm.pricePerLiter.value = "";
+  getFormField(elements.fillUpForm, "liters").value = "";
+  getFormField(elements.fillUpForm, "totalCost").value = "";
+  getFormField(elements.fillUpForm, "pricePerLiter").value = "";
   elements.fillUpCalcStatus.className = "lookup-status empty wide-field";
   elements.fillUpCalcStatus.textContent =
     "Enter any two of price per litre, volume, or total cost.";
@@ -2117,9 +2144,9 @@ function resetFillUpFormDerivedState() {
 
 function syncFillUpPricingFields() {
   const pricing = resolveFillUpPricing({
-    liters: numberOrNull(elements.fillUpForm.liters.value),
-    totalCost: numberOrNull(elements.fillUpForm.totalCost.value),
-    pricePerLiter: numberOrNull(elements.fillUpForm.pricePerLiter.value),
+    liters: numberOrNull(getFormField(elements.fillUpForm, "liters").value),
+    totalCost: numberOrNull(getFormField(elements.fillUpForm, "totalCost").value),
+    pricePerLiter: numberOrNull(getFormField(elements.fillUpForm, "pricePerLiter").value),
   });
 
   for (const [fieldName, digits] of [
@@ -2127,8 +2154,9 @@ function syncFillUpPricingFields() {
     ["totalCost", 2],
     ["pricePerLiter", 3],
   ]) {
-    if (!elements.fillUpForm[fieldName].matches(":focus") && Number.isFinite(pricing[fieldName])) {
-      elements.fillUpForm[fieldName].value = formatFixedInput(pricing[fieldName], digits);
+    const field = getFormField(elements.fillUpForm, fieldName);
+    if (!field.matches(":focus") && Number.isFinite(pricing[fieldName])) {
+      field.value = formatFixedInput(pricing[fieldName], digits);
     }
   }
 
@@ -2196,57 +2224,63 @@ function resolveFillUpPricing({ liters, totalCost, pricePerLiter }) {
 function getDerivedFillUpField(lastEditedField) {
   const order = ["liters", "totalCost", "pricePerLiter"];
   const available = order.filter((field) => field !== lastEditedField);
-  return available.find((field) => !elements.fillUpForm[field].matches(":focus")) || available[0];
+  return (
+    available.find((field) => !getFormField(elements.fillUpForm, field).matches(":focus")) ||
+    available[0]
+  );
 }
 
 function resetTripFormDerivedState() {
   lastTripVehicleSelection = "";
-  elements.tripForm.tripMpgUk.value = "";
-  elements.tripForm.totalCost.value = "";
-  elements.tripForm.fuelPricePerLiter.value = "";
+  getFormField(elements.tripForm, "tripMpgUk").value = "";
+  getFormField(elements.tripForm, "totalCost").value = "";
+  getFormField(elements.tripForm, "fuelPricePerLiter").value = "";
   elements.tripCalcStatus.className = "lookup-status empty wide-field";
   elements.tripCalcStatus.textContent =
     "Trip fuel cost uses the previous fill-up price for this vehicle.";
 }
 
 function syncTripFormDerivedFields() {
-  const vehicle = getVehicleById(elements.tripForm.vehicleId.value);
+  const vehicle = getVehicleById(getFormField(elements.tripForm, "vehicleId").value);
   if (!vehicle) {
     resetTripFormDerivedState();
     return;
   }
 
   if (
-    !elements.tripForm.tripMpgUk.matches(":focus") &&
-    (vehicle.id !== lastTripVehicleSelection || !numberOrNull(elements.tripForm.tripMpgUk.value))
+    !getFormField(elements.tripForm, "tripMpgUk").matches(":focus") &&
+    (vehicle.id !== lastTripVehicleSelection ||
+      !numberOrNull(getFormField(elements.tripForm, "tripMpgUk").value))
   ) {
     const profileMpgUk = getVehicleProfileMpgUk(vehicle);
-    elements.tripForm.tripMpgUk.value =
+    getFormField(elements.tripForm, "tripMpgUk").value =
       profileMpgUk !== null ? formatFixedInput(profileMpgUk, 1) : "";
   }
   lastTripVehicleSelection = vehicle.id;
 
-  const startOdometer = numberOrNull(elements.tripForm.startOdometer.value);
-  const endOdometer = numberOrNull(elements.tripForm.endOdometer.value);
+  const startOdometer = numberOrNull(getFormField(elements.tripForm, "startOdometer").value);
+  const endOdometer = numberOrNull(getFormField(elements.tripForm, "endOdometer").value);
   const distance =
     Number.isFinite(startOdometer) && Number.isFinite(endOdometer)
       ? endOdometer - startOdometer
       : null;
-  const tripMpgUk = numberOrNull(elements.tripForm.tripMpgUk.value);
-  const litersUsed = numberOrNull(elements.tripForm.litersUsed.value);
+  const tripMpgUk = numberOrNull(getFormField(elements.tripForm, "tripMpgUk").value);
+  const litersUsed = numberOrNull(getFormField(elements.tripForm, "litersUsed").value);
   const estimate = estimateTripFuel({
     vehicle,
-    date: elements.tripForm.date.value,
+    date: getFormField(elements.tripForm, "date").value,
     startOdometer,
     distance,
     tripMpgUk,
     litersUsed,
   });
 
-  elements.tripForm.fuelPricePerLiter.value = Number.isFinite(estimate.pricePerLiter)
+  getFormField(elements.tripForm, "fuelPricePerLiter").value = Number.isFinite(
+    estimate.pricePerLiter
+  )
     ? formatFixedInput(estimate.pricePerLiter, 3)
     : "";
-  elements.tripForm.totalCost.value = Number.isFinite(estimate.totalCost)
+  getFormField(elements.tripForm, "totalCost").value = Number.isFinite(estimate.totalCost)
     ? formatFixedInput(estimate.totalCost, 2)
     : "";
 
