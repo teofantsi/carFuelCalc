@@ -177,10 +177,10 @@ function bindEvents() {
   elements.syncNowBtn.addEventListener("click", () => void syncRemoteState(true));
   elements.switchProfileBtn.addEventListener("click", handleSwitchProfile);
   elements.showVehicleSectionBtn.addEventListener("click", () =>
-    revealSection("vehicle")
+    toggleSection("vehicle")
   );
   elements.showSettingsSectionBtn.addEventListener("click", () =>
-    revealSection("settings")
+    toggleSection("settings")
   );
   elements.vehicleForm.addEventListener("submit", handleVehicleSubmit);
   elements.plateLookupBtn.addEventListener("click", () => void handlePlateLookup());
@@ -1190,10 +1190,10 @@ function renderSectionVisibility() {
     String(sectionVisibility.settings)
   );
   elements.showVehicleSectionBtn.textContent = sectionVisibility.vehicle
-    ? "Car section open"
+    ? "Close car section"
     : "Add a car";
   elements.showSettingsSectionBtn.textContent = sectionVisibility.settings
-    ? "Settings open"
+    ? "Close settings"
     : "Open settings";
 }
 
@@ -1205,6 +1205,22 @@ function revealSection(sectionKey) {
   sectionVisibility[sectionKey] = true;
   renderSectionVisibility();
   cardMap[sectionKey]?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function hideSection(sectionKey) {
+  if (!sectionVisibility[sectionKey]) {
+    return;
+  }
+  sectionVisibility[sectionKey] = false;
+  renderSectionVisibility();
+}
+
+function toggleSection(sectionKey) {
+  if (sectionVisibility[sectionKey]) {
+    hideSection(sectionKey);
+    return;
+  }
+  revealSection(sectionKey);
 }
 
 function summarizeTripCategories(trips) {
@@ -1799,6 +1815,7 @@ function handleVehicleSubmit(event) {
   }
 
   resetVehicleForm();
+  hideSection("vehicle");
   persistAndRender();
   void syncRemoteState();
 }
@@ -1973,6 +1990,7 @@ function handleSettingsSubmit(event) {
   };
 
   applyTheme();
+  hideSection("settings");
   persistAndRender();
   void syncRemoteState();
   void refreshWeatherSummary();
