@@ -310,6 +310,69 @@
           <article class="card wide">
             <div class="section-heading">
               <div>
+                <p class="eyebrow">Ownership Costs</p>
+                <h2>Log yearly car costs</h2>
+              </div>
+            </div>
+            <form id="ownershipCostForm" class="form-grid">
+              <label>
+                Vehicle
+                <select name="vehicleId" required></select>
+              </label>
+              <label>
+                Date
+                <input name="date" type="date" required />
+              </label>
+              <label>
+                Cost type
+                <select name="category" required>
+                  <option value="service">Service</option>
+                  <option value="tax">Tax</option>
+                  <option value="carPayment">Car payment</option>
+                  <option value="insurance">Insurance</option>
+                </select>
+              </label>
+              <label>
+                Amount
+                <input name="totalCost" type="number" min="0" step="0.01" required />
+              </label>
+              <label class="wide-field">
+                Notes
+                <textarea
+                  name="notes"
+                  rows="3"
+                  placeholder="Annual premium, monthly finance payment, MOT + service, road tax renewal..."
+                ></textarea>
+              </label>
+              <button type="submit" class="primary-button">Save cost</button>
+            </form>
+
+            <div class="section-heading cost-breakdown-heading">
+              <div>
+                <p class="eyebrow">Annual Breakdown</p>
+                <h2>Service, tax, payments, insurance</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Service</th>
+                    <th>Tax</th>
+                    <th>Car payments</th>
+                    <th>Insurance</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody id="ownershipBreakdownBody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card wide">
+            <div class="section-heading">
+              <div>
                 <p class="eyebrow">Fuel History</p>
                 <h2>Recent fill-ups</h2>
               </div>
@@ -355,6 +418,30 @@
                   </tr>
                 </thead>
                 <tbody id="tripTableBody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card wide">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Ownership History</p>
+                <h2>Recent car costs</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Vehicle</th>
+                    <th>Type</th>
+                    <th>Cost</th>
+                    <th>Notes</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="ownershipCostTableBody"></tbody>
               </table>
             </div>
           </article>

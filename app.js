@@ -71,6 +71,7 @@ const defaultState = {
   vehicles: [],
   fillUps: [],
   trips: [],
+  ownershipCosts: [],
   weatherCache: {},
 };
 
@@ -121,6 +122,9 @@ const elements = {
   tripForm: document.querySelector("#tripForm"),
   tripCalcStatus: document.querySelector("#tripCalcStatus"),
   tripTableBody: document.querySelector("#tripTableBody"),
+  ownershipCostForm: document.querySelector("#ownershipCostForm"),
+  ownershipCostTableBody: document.querySelector("#ownershipCostTableBody"),
+  ownershipBreakdownBody: document.querySelector("#ownershipBreakdownBody"),
   settingsForm: document.querySelector("#settingsForm"),
   vehicleFilter: document.querySelector("#vehicleFilter"),
   exportBtn: document.querySelector("#exportBtn"),
@@ -177,6 +181,9 @@ function bindEvents() {
     elements.fillUpForm[fieldName].addEventListener("change", syncFillUpPricingFields);
   }
   elements.tripForm.addEventListener("submit", (event) => void handleTripSubmit(event));
+  elements.ownershipCostForm.addEventListener("submit", (event) =>
+    void handleOwnershipCostSubmit(event)
+  );
   for (const fieldName of [
     "vehicleId",
     "date",
@@ -223,6 +230,7 @@ function mergeState(incoming = {}) {
     vehicles: Array.isArray(incoming.vehicles) ? incoming.vehicles : [],
     fillUps: Array.isArray(incoming.fillUps) ? incoming.fillUps : [],
     trips: Array.isArray(incoming.trips) ? incoming.trips : [],
+    ownershipCosts: Array.isArray(incoming.ownershipCosts) ? incoming.ownershipCosts : [],
   };
 }
 
@@ -237,6 +245,8 @@ function syncFormsFromState() {
   elements.settingsForm.consumptionMode.value = state.settings.consumptionMode;
   elements.fillUpForm.date.value = getLocalDateString();
   elements.tripForm.date.value = getLocalDateString();
+  elements.ownershipCostForm.date.value = getLocalDateString();
+  elements.ownershipCostForm.category.value = "service";
   elements.profileNickname.value = state.session.nickname || "";
   elements.fillUpCalcStatus.textContent =
     "Enter any two of price per litre, volume, or total cost.";
@@ -258,6 +268,8 @@ function render() {
   renderReports();
   renderFuelTable();
   renderTripTable();
+  renderOwnershipCostTable();
+  renderOwnershipBreakdown();
   updateFormAvailability();
   syncFillUpPricingFields();
   syncTripFormDerivedFields();
@@ -300,6 +312,7 @@ function renderVehicleOptions() {
   const selectedFilter = elements.vehicleFilter.value || "all";
   const selectedFuelVehicle = elements.fillUpForm.vehicleId?.value || "";
   const selectedTripVehicle = elements.tripForm.vehicleId?.value || "";
+  const selectedOwnershipVehicle = elements.ownershipCostForm.vehicleId?.value || "";
   const filterOptions = ['<option value="all">All vehicles</option>']
     .concat(
       state.vehicles.map(
@@ -326,6 +339,8 @@ function renderVehicleOptions() {
     vehicleOptions || '<option value="">Add a vehicle first</option>';
   elements.tripForm.vehicleId.innerHTML =
     vehicleOptions || '<option value="">Add a vehicle first</option>';
+  elements.ownershipCostForm.vehicleId.innerHTML =
+    vehicleOptions || '<option value="">Add a vehicle first</option>';
 
   if (state.vehicles.some((vehicle) => vehicle.id === selectedFuelVehicle)) {
     elements.fillUpForm.vehicleId.value = selectedFuelVehicle;
@@ -333,12 +348,18 @@ function renderVehicleOptions() {
   if (state.vehicles.some((vehicle) => vehicle.id === selectedTripVehicle)) {
     elements.tripForm.vehicleId.value = selectedTripVehicle;
   }
+  if (state.vehicles.some((vehicle) => vehicle.id === selectedOwnershipVehicle)) {
+    elements.ownershipCostForm.vehicleId.value = selectedOwnershipVehicle;
+  }
 
   if (!elements.fillUpForm.vehicleId.value && state.vehicles[0]) {
     elements.fillUpForm.vehicleId.value = state.vehicles[0].id;
   }
   if (!elements.tripForm.vehicleId.value && state.vehicles[0]) {
     elements.tripForm.vehicleId.value = state.vehicles[0].id;
+  }
+  if (!elements.ownershipCostForm.vehicleId.value && state.vehicles[0]) {
+    elements.ownershipCostForm.vehicleId.value = state.vehicles[0].id;
   }
 }
 
@@ -386,12 +407,13 @@ function renderVehicleList() {
 function renderStats() {
   const filteredFillUps = getFilteredFillUps();
   const filteredTrips = getFilteredTrips();
-  const totals = summarizeEntries(filteredFillUps, filteredTrips);
+  const filteredOwnershipCosts = getFilteredOwnershipCosts();
+  const totals = summarizeEntries(filteredFillUps, filteredTrips, filteredOwnershipCosts);
   const stats = [
     {
       label: "Total spend",
       value: formatCurrency(totals.totalSpend),
-      meta: `${filteredFillUps.length} fill-ups · ${filteredTrips.length} trips`,
+      meta: `${filteredFillUps.length} fill-ups · ${filteredTrips.length} trips · ${filteredOwnershipCosts.length} ownership costs`,
     },
     {
       label: "Fuel purchased",
@@ -420,9 +442,9 @@ function renderStats() {
         : "Derived from trip MPG or liters used",
     },
     {
-      label: "Average trip cost",
-      value: formatCurrency(totals.averageTripCost),
-      meta: filteredTrips.length ? "Estimated fuel cost per trip" : "Trips use the previous fill-up price",
+      label: "Ownership costs",
+      value: formatCurrency(totals.totalOwnershipCost),
+      meta: filteredOwnershipCosts.length ? "Service, tax, payments, insurance" : "Log yearly car costs below",
     },
   ];
 
@@ -439,11 +461,13 @@ function renderStats() {
 function renderCharts() {
   const fillUps = getFilteredFillUps();
   const trips = getFilteredTrips();
+  const ownershipCosts = getFilteredOwnershipCosts();
   const fillUpVehicleUnit = getCurrentFilterUnit(fillUps);
   const tripVehicleUnit = getCurrentFilterUnitFromTrips(trips);
   const chartData = buildDashboardChartData(
     fillUps,
     trips,
+    ownershipCosts,
     fillUpVehicleUnit,
     tripVehicleUnit
   );
@@ -536,7 +560,7 @@ function renderChartMetrics(metrics) {
     .join("");
 }
 
-function buildDashboardChartData(fillUps, trips, fillUpVehicleUnit, tripVehicleUnit) {
+function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUnit, tripVehicleUnit) {
   const efficiencyValues = fillUps
     .filter((entry) => Number.isFinite(entry.efficiency))
     .map((entry) =>
@@ -548,7 +572,7 @@ function buildDashboardChartData(fillUps, trips, fillUpVehicleUnit, tripVehicleU
   const priceValues = fillUps
     .map((entry) => entry.pricePerLiter)
     .filter((value) => Number.isFinite(value));
-  const monthlySpendSeries = buildMonthlySpendSeries(fillUps, trips);
+  const monthlySpendSeries = buildMonthlySpendSeries(fillUps, trips, ownershipCosts);
   const monthlySpendValues = monthlySpendSeries.map((item) => item.value);
   const tripDistanceValues = trips
     .map((trip) => normalizeTripDistance(trip, tripVehicleUnit))
@@ -938,9 +962,10 @@ function renderReports() {
 }
 
 function buildReports(fillUps, trips) {
-  const totals = summarizeEntries(fillUps, trips);
-  const monthSeries = buildMonthlySpendSeries(fillUps, trips, { limit: null });
-  const yearSeries = buildYearlySpendSeries(fillUps, trips);
+  const ownershipCosts = getFilteredOwnershipCosts();
+  const totals = summarizeEntries(fillUps, trips, ownershipCosts);
+  const monthSeries = buildMonthlySpendSeries(fillUps, trips, ownershipCosts, { limit: null });
+  const yearSeries = buildYearlySpendSeries(fillUps, trips, ownershipCosts);
   const currentMonth = monthSeries.at(-1);
   const previousMonth = monthSeries.at(-2);
   const peakMonth = monthSeries.length
@@ -978,6 +1003,12 @@ function buildReports(fillUps, trips) {
         { label: "Avg fill-up", value: formatCurrency(fillUps.length ? totals.totalFuelCost / fillUps.length : 0) },
         { label: "Peak month", value: peakMonth ? `${peakMonth.label} · ${formatCurrency(peakMonth.value)}` : "Pending" },
       ],
+    },
+    {
+      title: "Ownership cost report",
+      summary: "Annual car-running costs beyond fuel, broken down by service, tax, payments, and insurance.",
+      badge: ownershipCosts.length ? `${ownershipCosts.length} costs logged` : "",
+      metrics: buildOwnershipReportMetrics(yearSeries),
     },
     {
       title: "Efficiency report",
@@ -1061,7 +1092,8 @@ function summarizeVehicleComparison(fillUps, trips) {
     const vehicle = getVehicleById(selectedVehicle);
     const vehicleFillUps = fillUps.filter((entry) => entry.vehicleId === selectedVehicle);
     const vehicleTrips = trips.filter((trip) => trip.vehicleId === selectedVehicle);
-    const totals = summarizeEntries(vehicleFillUps, vehicleTrips);
+    const vehicleOwnershipCosts = state.ownershipCosts.filter((cost) => cost.vehicleId === selectedVehicle);
+    const totals = summarizeEntries(vehicleFillUps, vehicleTrips, vehicleOwnershipCosts);
     return {
       badge: vehicle?.name || "Vehicle view",
       metrics: [
@@ -1077,7 +1109,8 @@ function summarizeVehicleComparison(fillUps, trips) {
     .map((vehicle) => {
       const vehicleFillUps = fillUps.filter((entry) => entry.vehicleId === vehicle.id);
       const vehicleTrips = trips.filter((trip) => trip.vehicleId === vehicle.id);
-      const totals = summarizeEntries(vehicleFillUps, vehicleTrips);
+      const vehicleOwnershipCosts = state.ownershipCosts.filter((cost) => cost.vehicleId === vehicle.id);
+      const totals = summarizeEntries(vehicleFillUps, vehicleTrips, vehicleOwnershipCosts);
       return {
         vehicle,
         totals,
@@ -1148,7 +1181,8 @@ function summarizeWeatherImpact(fillUps) {
 }
 
 function projectNextMonthSpend(fillUps, trips) {
-  const allItems = [...fillUps, ...trips].sort((a, b) => a.date.localeCompare(b.date));
+  const ownershipCosts = getFilteredOwnershipCosts();
+  const allItems = [...fillUps, ...trips, ...ownershipCosts].sort((a, b) => a.date.localeCompare(b.date));
   if (!allItems.length) {
     return {
       badge: "No spend history",
@@ -1164,8 +1198,8 @@ function projectNextMonthSpend(fillUps, trips) {
   cutoff.setDate(cutoff.getDate() - 90);
   const recentItems = allItems.filter((item) => new Date(item.date) >= cutoff);
   const recentQuarterSpend = recentItems.reduce((sum, item) => sum + (item.totalCost || 0), 0);
-  const nextMonth = recentQuarterSpend / 3 || projectMonthlySpend(fillUps, trips);
-  const monthlyAverage = projectMonthlySpend(fillUps, trips);
+  const nextMonth = recentQuarterSpend / 3 || projectMonthlySpend(fillUps, trips, ownershipCosts);
+  const monthlyAverage = projectMonthlySpend(fillUps, trips, ownershipCosts);
 
   return {
     badge: recentItems.length ? "Recent spend model" : "Simple monthly projection",
@@ -1182,6 +1216,7 @@ function buildYearlyFigureMetrics(yearSeries) {
       { label: "Latest year", value: "Pending" },
       { label: "Fuel spend", value: "Pending" },
       { label: "Trip fuel", value: "Pending" },
+      { label: "Ownership", value: "Pending" },
       { label: "Distance", value: "Pending" },
     ];
   }
@@ -1191,6 +1226,7 @@ function buildYearlyFigureMetrics(yearSeries) {
     { label: "Latest year", value: String(latest.year) },
     { label: "Fuel spend", value: formatCurrency(latest.fuelCost) },
     { label: "Trip fuel", value: formatCurrency(latest.tripCost) },
+    { label: "Ownership", value: formatCurrency(latest.ownershipCost || 0) },
     { label: "Distance", value: formatDistance(latest.tripDistance, latest.distanceUnit) },
   ];
 }
@@ -1207,7 +1243,7 @@ function renderInsights() {
   const items = [
     {
       title: "Monthly burn",
-      body: formatCurrency(projectMonthlySpend(fillUps, trips)),
+      body: formatCurrency(projectMonthlySpend(fillUps, trips, getFilteredOwnershipCosts())),
     },
     {
       title: "Latest fill-up",
@@ -1298,11 +1334,65 @@ function renderTripTable() {
   }
 }
 
+function renderOwnershipCostTable() {
+  const costs = [...getFilteredOwnershipCosts()].sort((a, b) => b.date.localeCompare(a.date));
+  if (!costs.length) {
+    elements.ownershipCostTableBody.innerHTML =
+      '<tr><td colspan="6" class="empty">No ownership costs yet. Add service, tax, car payments, or insurance above.</td></tr>';
+    return;
+  }
+
+  elements.ownershipCostTableBody.innerHTML = costs
+    .map((cost) => {
+      const vehicle = getVehicleById(cost.vehicleId);
+      return `
+        <tr>
+          <td>${cost.date}</td>
+          <td>${escapeHtml(vehicle?.name || "Unknown vehicle")}</td>
+          <td>${escapeHtml(formatOwnershipCategory(cost.category))}</td>
+          <td>${formatCurrency(cost.totalCost || 0)}</td>
+          <td>${escapeHtml(cost.notes || "No notes")}</td>
+          <td><button class="danger-link" data-delete-ownership-cost="${cost.id}" type="button">Delete</button></td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  for (const button of elements.ownershipCostTableBody.querySelectorAll("[data-delete-ownership-cost]")) {
+    button.addEventListener("click", () => void deleteOwnershipCost(button.dataset.deleteOwnershipCost));
+  }
+}
+
+function renderOwnershipBreakdown() {
+  const breakdown = buildOwnershipYearBreakdown(getFilteredOwnershipCosts());
+  if (!breakdown.length) {
+    elements.ownershipBreakdownBody.innerHTML =
+      '<tr><td colspan="6" class="empty">Yearly totals appear after you log ownership costs.</td></tr>';
+    return;
+  }
+
+  elements.ownershipBreakdownBody.innerHTML = breakdown
+    .map(
+      (year) => `
+        <tr>
+          <td>${year.year}</td>
+          <td>${formatCurrency(year.service)}</td>
+          <td>${formatCurrency(year.tax)}</td>
+          <td>${formatCurrency(year.carPayment)}</td>
+          <td>${formatCurrency(year.insurance)}</td>
+          <td><strong>${formatCurrency(year.total)}</strong></td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
 function updateFormAvailability() {
   const enabled = hasProfileSession();
   setFormInteractive(elements.vehicleForm, enabled);
   setFormInteractive(elements.fillUpForm, enabled && state.vehicles.length > 0);
   setFormInteractive(elements.tripForm, enabled && state.vehicles.length > 0);
+  setFormInteractive(elements.ownershipCostForm, enabled && state.vehicles.length > 0);
   setFormInteractive(elements.settingsForm, enabled);
   elements.syncNowBtn.disabled = !enabled || syncInFlight;
   elements.switchProfileBtn.disabled = !enabled;
@@ -1699,6 +1789,39 @@ async function handleTripSubmit(event) {
   await syncRemoteState();
 }
 
+async function handleOwnershipCostSubmit(event) {
+  event.preventDefault();
+  if (!requireProfile()) {
+    return;
+  }
+  if (!state.vehicles.length) {
+    alert("Add a vehicle first.");
+    return;
+  }
+
+  const formData = new FormData(event.currentTarget);
+  const vehicleId = formData.get("vehicleId").toString();
+  const vehicle = getVehicleById(vehicleId);
+
+  state.ownershipCosts.push({
+    id: crypto.randomUUID(),
+    vehicleId,
+    date: formData.get("date").toString(),
+    category: formData.get("category").toString(),
+    totalCost: Number(formData.get("totalCost")),
+    notes: formData.get("notes").toString().trim(),
+  });
+
+  event.currentTarget.reset();
+  event.currentTarget.date.value = getLocalDateString();
+  event.currentTarget.category.value = "service";
+  if (vehicle) {
+    event.currentTarget.vehicleId.value = vehicle.id;
+  }
+  persistAndRender();
+  await syncRemoteState();
+}
+
 function handleSettingsSubmit(event) {
   event.preventDefault();
   if (!requireProfile()) {
@@ -1733,6 +1856,12 @@ async function deleteTrip(entryId) {
   await syncRemoteState();
 }
 
+async function deleteOwnershipCost(entryId) {
+  state.ownershipCosts = state.ownershipCosts.filter((cost) => cost.id !== entryId);
+  persistAndRender();
+  await syncRemoteState();
+}
+
 async function deleteVehicle(vehicleId) {
   const vehicle = getVehicleById(vehicleId);
   if (!vehicle) {
@@ -1741,8 +1870,9 @@ async function deleteVehicle(vehicleId) {
 
   const fillUpCount = state.fillUps.filter((entry) => entry.vehicleId === vehicleId).length;
   const tripCount = state.trips.filter((trip) => trip.vehicleId === vehicleId).length;
+  const ownershipCostCount = state.ownershipCosts.filter((cost) => cost.vehicleId === vehicleId).length;
   const confirmed = window.confirm(
-    `Delete ${vehicle.name}? This will also remove ${fillUpCount} fill-ups and ${tripCount} trips linked to it.`
+    `Delete ${vehicle.name}? This will also remove ${fillUpCount} fill-ups, ${tripCount} trips, and ${ownershipCostCount} ownership costs linked to it.`
   );
   if (!confirmed) {
     return;
@@ -1751,6 +1881,7 @@ async function deleteVehicle(vehicleId) {
   state.vehicles = state.vehicles.filter((entry) => entry.id !== vehicleId);
   state.fillUps = state.fillUps.filter((entry) => entry.vehicleId !== vehicleId);
   state.trips = state.trips.filter((trip) => trip.vehicleId !== vehicleId);
+  state.ownershipCosts = state.ownershipCosts.filter((cost) => cost.vehicleId !== vehicleId);
   if (editingVehicleId === vehicleId) {
     resetVehicleForm();
   }
@@ -2116,6 +2247,16 @@ function buildBackupCsv() {
       weatherTempC: trip.weather?.tempC,
       weatherWindKph: trip.weather?.windKph,
     })),
+    ...state.ownershipCosts.map((cost) => ({
+      backupVersion: BACKUP_CSV_VERSION,
+      recordType: "ownershipCost",
+      id: cost.id,
+      vehicleId: cost.vehicleId,
+      date: cost.date,
+      category: cost.category,
+      totalCost: cost.totalCost,
+      notes: cost.notes,
+    })),
   ];
 
   return serializeCsvRows(rows, BACKUP_CSV_COLUMNS);
@@ -2124,7 +2265,7 @@ function buildBackupCsv() {
 function importBackupCsv(csvText) {
   const normalizedCsvText = String(csvText).replace(/^\uFEFF/, "");
   const rows = parseCsvRows(normalizedCsvText);
-  const knownRecordTypes = new Set(["settings", "vehicle", "fillUp", "trip"]);
+  const knownRecordTypes = new Set(["settings", "vehicle", "fillUp", "trip", "ownershipCost"]);
   if (!rows.length) {
     throw new Error("Empty backup.");
   }
@@ -2143,6 +2284,7 @@ function importRoadLedgerRows(rows) {
     vehicles: [],
     fillUps: [],
     trips: [],
+    ownershipCosts: [],
     weatherCache: {},
   };
 
@@ -2221,6 +2363,16 @@ function importRoadLedgerRows(rows) {
           });
         }
         break;
+      case "ownershipCost":
+        imported.ownershipCosts.push({
+          id: row.id || crypto.randomUUID(),
+          vehicleId: row.vehicleId || "",
+          date: row.date || "",
+          category: row.category || "service",
+          totalCost: parseNumberOrZero(row.totalCost),
+          notes: row.notes || "",
+        });
+        break;
       default:
         break;
     }
@@ -2229,7 +2381,7 @@ function importRoadLedgerRows(rows) {
   if (
     !rows.length ||
     !rows.some((row) =>
-      ["settings", "vehicle", "fillUp", "trip"].includes(row.recordType)
+      ["settings", "vehicle", "fillUp", "trip", "ownershipCost"].includes(row.recordType)
     )
   ) {
     throw new Error("Empty backup.");
@@ -2300,6 +2452,7 @@ function importFuelioCsv(csvText) {
       };
     }),
     trips: [],
+    ownershipCosts: [],
     weatherCache: {},
   };
 
@@ -2563,6 +2716,12 @@ async function seedDemoData() {
     makeDemoTrip(vehicleId, "2026-05-18", 24401, 24574, "Weekend", 44.2, 11.2, 1.51, "London", "Brighton"),
     makeDemoTrip(vehicleId, "2026-05-29", 24782, 24864, "Errands", 44.2, 4.6, 1.53, "Home", "Westfield"),
   ];
+  state.ownershipCosts = [
+    makeDemoOwnershipCost(vehicleId, "2026-01-12", "insurance", 612.4, "Annual insurance premium"),
+    makeDemoOwnershipCost(vehicleId, "2026-03-01", "tax", 190, "Road tax"),
+    makeDemoOwnershipCost(vehicleId, "2026-04-22", "service", 284.5, "Annual service and MOT"),
+    makeDemoOwnershipCost(vehicleId, "2026-05-28", "carPayment", 219, "Monthly finance payment"),
+  ];
 
   recomputeEfficiencies();
   persistAndRender();
@@ -2620,6 +2779,17 @@ function makeDemoTrip(
   };
 }
 
+function makeDemoOwnershipCost(vehicleId, date, category, totalCost, notes) {
+  return {
+    id: crypto.randomUUID(),
+    vehicleId,
+    date,
+    category,
+    totalCost,
+    notes,
+  };
+}
+
 function recomputeEfficiencies() {
   const sorted = [...state.fillUps].sort(
     (a, b) => a.date.localeCompare(b.date) || a.odometer - b.odometer
@@ -2652,9 +2822,10 @@ function computeEfficiencyForNewFillUp(fillUp) {
   return distance > 0 ? distance / fillUp.liters : null;
 }
 
-function summarizeEntries(fillUps, trips) {
+function summarizeEntries(fillUps, trips, ownershipCosts = []) {
   const totalFuelCost = fillUps.reduce((sum, entry) => sum + entry.totalCost, 0);
   const totalTripCost = trips.reduce((sum, trip) => sum + (trip.totalCost || 0), 0);
+  const totalOwnershipCost = ownershipCosts.reduce((sum, cost) => sum + (cost.totalCost || 0), 0);
   const totalLiters = fillUps.reduce((sum, entry) => sum + entry.liters, 0);
   const tripFuelSeries = trips
     .map((trip) => getTripFuelLiters(trip))
@@ -2702,9 +2873,10 @@ function summarizeEntries(fillUps, trips) {
     : null;
 
   return {
-    totalSpend: totalFuelCost + totalTripCost,
+    totalSpend: totalFuelCost + totalTripCost + totalOwnershipCost,
     totalFuelCost,
     totalTripCost,
+    totalOwnershipCost,
     totalLiters,
     tripLiters,
     averagePricePerLiter: totalLiters ? totalFuelCost / totalLiters : 0,
@@ -2729,8 +2901,8 @@ function summarizeEntries(fillUps, trips) {
   };
 }
 
-function projectMonthlySpend(fillUps, trips) {
-  const items = [...fillUps, ...trips];
+function projectMonthlySpend(fillUps, trips, ownershipCosts = []) {
+  const items = [...fillUps, ...trips, ...ownershipCosts];
   if (items.length < 2) {
     return items.reduce((sum, item) => sum + (item.totalCost || 0), 0);
   }
@@ -2743,9 +2915,9 @@ function projectMonthlySpend(fillUps, trips) {
   return (total / days) * 30;
 }
 
-function buildMonthlySpendSeries(fillUps, trips, options = {}) {
+function buildMonthlySpendSeries(fillUps, trips, ownershipCosts = [], options = {}) {
   const bucket = new Map();
-  for (const item of [...fillUps, ...trips]) {
+  for (const item of [...fillUps, ...trips, ...ownershipCosts]) {
     const month = item.date.slice(0, 7);
     bucket.set(month, (bucket.get(month) || 0) + (item.totalCost || 0));
   }
@@ -2756,7 +2928,7 @@ function buildMonthlySpendSeries(fillUps, trips, options = {}) {
   return limit ? series.slice(-limit) : series;
 }
 
-function buildYearlySpendSeries(fillUps, trips) {
+function buildYearlySpendSeries(fillUps, trips, ownershipCosts = []) {
   const bucket = new Map();
 
   for (const entry of fillUps) {
@@ -2778,6 +2950,15 @@ function buildYearlySpendSeries(fillUps, trips) {
     bucket.set(year, record);
   }
 
+  for (const cost of ownershipCosts) {
+    const year = cost.date.slice(0, 4);
+    const record = bucket.get(year) || makeYearBucket();
+    record.ownershipCost += cost.totalCost || 0;
+    record.totalSpend += cost.totalCost || 0;
+    record[cost.category] = (record[cost.category] || 0) + (cost.totalCost || 0);
+    bucket.set(year, record);
+  }
+
   return [...bucket.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([year, totals]) => ({ year, ...totals }));
@@ -2787,6 +2968,11 @@ function makeYearBucket() {
   return {
     fuelCost: 0,
     tripCost: 0,
+    ownershipCost: 0,
+    service: 0,
+    tax: 0,
+    carPayment: 0,
+    insurance: 0,
     totalSpend: 0,
     totalLiters: 0,
     tripDistance: 0,
@@ -2811,6 +2997,13 @@ function getFilteredTrips() {
     );
 }
 
+function getFilteredOwnershipCosts() {
+  const selectedVehicle = elements.vehicleFilter.value;
+  return state.ownershipCosts
+    .filter((cost) => selectedVehicle === "all" || cost.vehicleId === selectedVehicle)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function getVehicleById(vehicleId) {
   return state.vehicles.find((vehicle) => vehicle.id === vehicleId);
 }
@@ -2818,6 +3011,57 @@ function getVehicleById(vehicleId) {
 function getGarageDistanceUnit() {
   const units = new Set(state.vehicles.map((vehicle) => vehicle.distanceUnit || "km"));
   return units.size === 1 ? [...units][0] : "km";
+}
+
+function buildOwnershipYearBreakdown(costs) {
+  const byYear = new Map();
+  for (const cost of costs) {
+    const year = cost.date.slice(0, 4) || "Unknown";
+    const record = byYear.get(year) || {
+      year,
+      service: 0,
+      tax: 0,
+      carPayment: 0,
+      insurance: 0,
+      total: 0,
+    };
+    record[cost.category] = (record[cost.category] || 0) + (cost.totalCost || 0);
+    record.total += cost.totalCost || 0;
+    byYear.set(year, record);
+  }
+
+  return [...byYear.values()].sort((a, b) => b.year.localeCompare(a.year));
+}
+
+function buildOwnershipReportMetrics(yearSeries) {
+  const latest = yearSeries.at(-1);
+  if (!latest) {
+    return [
+      { label: "This year", value: "Pending" },
+      { label: "Service", value: "Pending" },
+      { label: "Tax", value: "Pending" },
+      { label: "Payments", value: "Pending" },
+      { label: "Insurance", value: "Pending" },
+    ];
+  }
+
+  return [
+    { label: "This year", value: formatCurrency(latest.ownershipCost || 0) },
+    { label: "Service", value: formatCurrency(latest.service || 0) },
+    { label: "Tax", value: formatCurrency(latest.tax || 0) },
+    { label: "Payments", value: formatCurrency(latest.carPayment || 0) },
+    { label: "Insurance", value: formatCurrency(latest.insurance || 0) },
+  ];
+}
+
+function formatOwnershipCategory(value) {
+  const labels = {
+    service: "Service",
+    tax: "Tax",
+    carPayment: "Car payment",
+    insurance: "Insurance",
+  };
+  return labels[value] || "Other";
 }
 
 function countVehicleEntries(vehicleId) {
@@ -3155,6 +3399,7 @@ async function syncRemoteState(showSuccessMessage = false) {
         vehicles: state.vehicles,
         fillUps: state.fillUps,
         trips: state.trips,
+        ownershipCosts: state.ownershipCosts,
       },
     });
     state.session.lastSyncedAt = response.profile.updatedAt || new Date().toISOString();
@@ -3186,6 +3431,9 @@ function applyRemoteResponse(response) {
     : [];
   state.trips = Array.isArray(response.profile.trips)
     ? response.profile.trips
+    : [];
+  state.ownershipCosts = Array.isArray(response.profile.ownershipCosts)
+    ? response.profile.ownershipCosts
     : [];
   recomputeEfficiencies();
   saveLocalState();
