@@ -351,6 +351,10 @@ textarea {
   gap: 16px;
 }
 
+[data-fold-content][hidden] {
+  display: none;
+}
+
 .primary-button {
   justify-self: start;
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
