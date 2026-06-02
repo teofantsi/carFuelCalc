@@ -33,6 +33,39 @@
           single hosted dashboard with lightweight nickname-based profiles.
         </p>
 
+        <section class="glass-card start-actions-card">
+          <div class="section-heading compact">
+            <div>
+              <p class="panel-label">Start here</p>
+              <strong>Open the sections you need</strong>
+            </div>
+          </div>
+          <p class="start-actions-copy">
+            Keep the workspace focused, then reveal setup and garage tools when
+            you need them.
+          </p>
+          <div class="action-row">
+            <button
+              id="showVehicleSectionBtn"
+              class="primary-button"
+              type="button"
+              aria-controls="vehicleCard"
+              aria-expanded="false"
+            >
+              Add a car
+            </button>
+            <button
+              id="showSettingsSectionBtn"
+              class="ghost-button"
+              type="button"
+              aria-controls="settingsCard"
+              aria-expanded="false"
+            >
+              Open settings
+            </button>
+          </div>
+        </section>
+
         <div class="hero-panels">
           <section class="glass-card">
             <div class="section-heading compact">
@@ -88,7 +121,7 @@
       </aside>
 
       <main class="content">
-        <section class="stats-grid" id="statsGrid"></section>
+        <section id="statsGrid" class="metric-sections"></section>
 
         <section class="layout-grid">
           <article class="card wide">
@@ -109,10 +142,10 @@
                 <h2>Monthly and yearly breakdowns</h2>
               </div>
             </div>
-            <div id="reportGrid" class="report-grid"></div>
+            <div id="reportGrid" class="report-sections"></div>
           </article>
 
-          <article class="card">
+          <article id="vehicleCard" class="card" hidden>
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Vehicles</p>
@@ -446,7 +479,7 @@
             </div>
           </article>
 
-          <article class="card">
+          <article id="settingsCard" class="card" hidden>
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Settings</p>

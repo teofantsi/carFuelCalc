@@ -104,6 +104,10 @@ let editingVehicleId = "";
 let lastFillUpPricingField = "";
 let lastTripVehicleSelection = "";
 let dashboardFocus = "efficiency";
+const sectionVisibility = {
+  vehicle: false,
+  settings: false,
+};
 
 const elements = {
   statsGrid: document.querySelector("#statsGrid"),
@@ -140,6 +144,10 @@ const elements = {
   syncNowBtn: document.querySelector("#syncNowBtn"),
   switchProfileBtn: document.querySelector("#switchProfileBtn"),
   themeToggleBtn: document.querySelector("#themeToggleBtn"),
+  showVehicleSectionBtn: document.querySelector("#showVehicleSectionBtn"),
+  showSettingsSectionBtn: document.querySelector("#showSettingsSectionBtn"),
+  vehicleCard: document.querySelector("#vehicleCard"),
+  settingsCard: document.querySelector("#settingsCard"),
 };
 
 void init();
@@ -168,6 +176,12 @@ function bindEvents() {
   elements.profileForm.addEventListener("submit", handleProfileSubmit);
   elements.syncNowBtn.addEventListener("click", () => void syncRemoteState(true));
   elements.switchProfileBtn.addEventListener("click", handleSwitchProfile);
+  elements.showVehicleSectionBtn.addEventListener("click", () =>
+    revealSection("vehicle")
+  );
+  elements.showSettingsSectionBtn.addEventListener("click", () =>
+    revealSection("settings")
+  );
   elements.vehicleForm.addEventListener("submit", handleVehicleSubmit);
   elements.plateLookupBtn.addEventListener("click", () => void handlePlateLookup());
   elements.vehicleForm.registrationNumber.addEventListener("input", handleRegistrationInput);
@@ -261,6 +275,7 @@ function syncFormsFromState() {
 function render() {
   renderVehicleOptions();
   renderProfile();
+  renderSectionVisibility();
   renderVehicleList();
   renderStats();
   renderCharts();
@@ -411,53 +426,91 @@ function renderStats() {
   const filteredTrips = getFilteredTrips();
   const filteredOwnershipCosts = getFilteredOwnershipCosts();
   const totals = summarizeEntries(filteredFillUps, filteredTrips, filteredOwnershipCosts);
-  const stats = [
+  const groups = [
     {
-      label: "Total spend",
-      value: formatCurrency(totals.totalSpend),
-      meta: `${filteredFillUps.length} fill-ups · ${filteredTrips.length} trips · ${filteredOwnershipCosts.length} ownership costs`,
+      title: "Spend overview",
+      description: "Money going into fuel, trips, and ongoing ownership.",
+      stats: [
+        {
+          label: "Total spend",
+          value: formatCurrency(totals.totalSpend),
+          meta: `${filteredFillUps.length} fill-ups · ${filteredTrips.length} trips · ${filteredOwnershipCosts.length} ownership costs`,
+        },
+        {
+          label: "Ownership costs",
+          value: formatCurrency(totals.totalOwnershipCost),
+          meta: filteredOwnershipCosts.length
+            ? "Service, tax, payments, insurance"
+            : "Log yearly car costs below",
+        },
+      ],
     },
     {
-      label: "Fuel purchased",
-      value: `${formatNumber(totals.totalLiters, 1)} L`,
-      meta: `${formatCurrency(totals.averagePricePerLiter)}/L average`,
+      title: "Fuel and efficiency",
+      description: "How much fuel you are buying and how well the vehicles are performing.",
+      stats: [
+        {
+          label: "Fuel purchased",
+          value: `${formatNumber(totals.totalLiters, 1)} L`,
+          meta: `${formatCurrency(totals.averagePricePerLiter)}/L average`,
+        },
+        {
+          label: "Average efficiency",
+          value: totals.averageEfficiencyLabel,
+          meta: totals.bestEfficiencyLabel
+            ? `Best ${totals.bestEfficiencyLabel}`
+            : "Add two full fill-ups to calculate",
+        },
+      ],
     },
     {
-      label: "Trip distance",
-      value: formatDistance(totals.tripDistance, totals.distanceUnit),
-      meta: filteredTrips.length
-        ? `${formatDistance(totals.averageTripDistance, totals.distanceUnit)} average`
-        : "No trips yet",
-    },
-    {
-      label: "Average efficiency",
-      value: totals.averageEfficiencyLabel,
-      meta: totals.bestEfficiencyLabel
-        ? `Best ${totals.bestEfficiencyLabel}`
-        : "Add two full fill-ups to calculate",
-    },
-    {
-      label: "Trip fuel use",
-      value: totals.tripEfficiencyLabel,
-      meta: totals.tripLiters
-        ? `${formatNumber(totals.tripLiters, 1)} L logged`
-        : "Derived from trip MPG or liters used",
-    },
-    {
-      label: "Ownership costs",
-      value: formatCurrency(totals.totalOwnershipCost),
-      meta: filteredOwnershipCosts.length ? "Service, tax, payments, insurance" : "Log yearly car costs below",
+      title: "Trip activity",
+      description: "Distance and fuel use across recorded trips.",
+      stats: [
+        {
+          label: "Trip distance",
+          value: formatDistance(totals.tripDistance, totals.distanceUnit),
+          meta: filteredTrips.length
+            ? `${formatDistance(totals.averageTripDistance, totals.distanceUnit)} average`
+            : "No trips yet",
+        },
+        {
+          label: "Trip fuel use",
+          value: totals.tripEfficiencyLabel,
+          meta: totals.tripLiters
+            ? `${formatNumber(totals.tripLiters, 1)} L logged`
+            : "Derived from trip MPG or liters used",
+        },
+      ],
     },
   ];
 
-  elements.statsGrid.innerHTML = "";
-  for (const stat of stats) {
-    const node = elements.statCardTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector(".stat-label").textContent = stat.label;
-    node.querySelector(".stat-value").textContent = stat.value;
-    node.querySelector(".stat-meta").textContent = stat.meta;
-    elements.statsGrid.append(node);
-  }
+  elements.statsGrid.innerHTML = groups
+    .map(
+      (group) => `
+        <section class="metric-section">
+          <div class="metric-section-header">
+            <div>
+              <p class="eyebrow">Metrics</p>
+              <h2>${escapeHtml(group.title)}</h2>
+            </div>
+            <p class="metric-section-copy">${escapeHtml(group.description)}</p>
+          </div>
+          <div class="stats-grid">
+            ${group.stats.map((stat) => renderStatCard(stat)).join("")}
+          </div>
+        </section>
+      `
+    )
+    .join("");
+}
+
+function renderStatCard(stat) {
+  const node = elements.statCardTemplate.content.firstElementChild.cloneNode(true);
+  node.querySelector(".stat-label").textContent = stat.label;
+  node.querySelector(".stat-value").textContent = stat.value;
+  node.querySelector(".stat-meta").textContent = stat.meta;
+  return node.outerHTML;
 }
 
 function renderCharts() {
@@ -933,34 +986,73 @@ function renderReports() {
   const fillUps = getFilteredFillUps();
   const trips = getFilteredTrips();
   const reports = buildReports(fillUps, trips);
+  const reportSections = [
+    {
+      id: "costs",
+      title: "Cost reports",
+      description: "Spend across fuel, ownership, months, and years.",
+    },
+    {
+      id: "performance",
+      title: "Performance reports",
+      description: "Efficiency, trip behavior, weather impact, and vehicle comparisons.",
+    },
+    {
+      id: "planning",
+      title: "Planning reports",
+      description: "Forward-looking summaries and simple forecasting.",
+    },
+  ];
 
-  elements.reportGrid.innerHTML = reports
-    .map(
-      (report) => `
-        <article class="report-card${report.emphasis ? " emphasis" : ""}">
-          <div class="report-card-head">
+  elements.reportGrid.innerHTML = reportSections
+    .map((section) => {
+      const sectionReports = reports.filter((report) => report.section === section.id);
+      if (!sectionReports.length) {
+        return "";
+      }
+
+      return `
+        <section class="report-section">
+          <div class="metric-section-header">
             <div>
-              <h3>${escapeHtml(report.title)}</h3>
-              <p class="report-summary">${escapeHtml(report.summary)}</p>
+              <p class="eyebrow">Reports</p>
+              <h2>${escapeHtml(section.title)}</h2>
             </div>
-            ${report.badge ? `<span class="report-badge">${escapeHtml(report.badge)}</span>` : ""}
+            <p class="metric-section-copy">${escapeHtml(section.description)}</p>
           </div>
-          <div class="report-metrics">
-            ${report.metrics
-              .map(
-                (metric) => `
-                  <div class="report-metric">
-                    <span class="report-metric-label">${escapeHtml(metric.label)}</span>
-                    <strong class="report-metric-value">${escapeHtml(metric.value)}</strong>
-                  </div>
-                `
-              )
-              .join("")}
+          <div class="report-grid">
+            ${sectionReports.map((report) => renderReportCard(report)).join("")}
           </div>
-        </article>
-      `
-    )
+        </section>
+      `;
+    })
     .join("");
+}
+
+function renderReportCard(report) {
+  return `
+    <article class="report-card${report.emphasis ? " emphasis" : ""}">
+      <div class="report-card-head">
+        <div>
+          <h3>${escapeHtml(report.title)}</h3>
+          <p class="report-summary">${escapeHtml(report.summary)}</p>
+        </div>
+        ${report.badge ? `<span class="report-badge">${escapeHtml(report.badge)}</span>` : ""}
+      </div>
+      <div class="report-metrics">
+        ${report.metrics
+          .map(
+            (metric) => `
+              <div class="report-metric">
+                <span class="report-metric-label">${escapeHtml(metric.label)}</span>
+                <strong class="report-metric-value">${escapeHtml(metric.value)}</strong>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </article>
+  `;
 }
 
 function buildReports(fillUps, trips) {
@@ -995,6 +1087,7 @@ function buildReports(fillUps, trips) {
 
   return [
     {
+      section: "costs",
       title: "Fuel cost report",
       summary: "How much fuel is costing month to month and across the year.",
       badge: currentMonth ? `${currentMonth.label}` : "",
@@ -1007,12 +1100,14 @@ function buildReports(fillUps, trips) {
       ],
     },
     {
+      section: "costs",
       title: "Ownership cost report",
       summary: "Annual car-running costs beyond fuel, broken down by service, tax, payments, and insurance.",
       badge: ownershipCosts.length ? `${ownershipCosts.length} costs logged` : "",
       metrics: buildOwnershipReportMetrics(yearSeries),
     },
     {
+      section: "performance",
       title: "Efficiency report",
       summary: "Performance trend across recent full tanks, with rolling context.",
       badge: state.settings.consumptionMode.toUpperCase(),
@@ -1024,6 +1119,7 @@ function buildReports(fillUps, trips) {
       ],
     },
     {
+      section: "performance",
       title: "Trip report",
       summary: "Distance, trip mix, and estimated fuel cost for driving activity.",
       badge: `${trips.length} trips`,
@@ -1035,12 +1131,14 @@ function buildReports(fillUps, trips) {
       ],
     },
     {
+      section: "performance",
       title: "Vehicle comparison report",
       summary: "Which vehicle is taking the most spend and which one is performing best.",
       badge: vehicleComparison.badge,
       metrics: vehicleComparison.metrics,
     },
     {
+      section: "costs",
       title: "Monthly summary report",
       summary: "A quick month-over-month view for spend and movement.",
       badge: monthSeries.length ? `${monthSeries.length} months tracked` : "",
@@ -1052,12 +1150,14 @@ function buildReports(fillUps, trips) {
       ],
     },
     {
+      section: "performance",
       title: "Weather impact report",
       summary: "Checks whether colder or warmer conditions are lining up with efficiency changes.",
       badge: weatherImpact.badge,
       metrics: weatherImpact.metrics,
     },
     {
+      section: "planning",
       title: "Forecast report",
       summary: "Simple projection based on the most recent spend run-rate.",
       badge: forecast.badge,
@@ -1069,12 +1169,42 @@ function buildReports(fillUps, trips) {
       ],
     },
     {
+      section: "costs",
       title: "Yearly figures",
       summary: yearlyFigureSummary,
       badge: yearlyPeak ? `${yearlyPeak.year} peak` : "",
       metrics: buildYearlyFigureMetrics(yearSeries),
     },
   ];
+}
+
+function renderSectionVisibility() {
+  elements.vehicleCard.hidden = !sectionVisibility.vehicle;
+  elements.settingsCard.hidden = !sectionVisibility.settings;
+  elements.showVehicleSectionBtn.setAttribute(
+    "aria-expanded",
+    String(sectionVisibility.vehicle)
+  );
+  elements.showSettingsSectionBtn.setAttribute(
+    "aria-expanded",
+    String(sectionVisibility.settings)
+  );
+  elements.showVehicleSectionBtn.textContent = sectionVisibility.vehicle
+    ? "Car section open"
+    : "Add a car";
+  elements.showSettingsSectionBtn.textContent = sectionVisibility.settings
+    ? "Settings open"
+    : "Open settings";
+}
+
+function revealSection(sectionKey) {
+  const cardMap = {
+    vehicle: elements.vehicleCard,
+    settings: elements.settingsCard,
+  };
+  sectionVisibility[sectionKey] = true;
+  renderSectionVisibility();
+  cardMap[sectionKey]?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function summarizeTripCategories(trips) {
@@ -1586,6 +1716,7 @@ function startVehicleEdit(vehicleId) {
     return;
   }
 
+  revealSection("vehicle");
   editingVehicleId = vehicle.id;
   vehicleLookupResult = vehicle.registrationNumber
     ? {

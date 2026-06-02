@@ -170,9 +170,21 @@ textarea {
 .action-list,
 .list,
 .weather-summary,
-.profile-meta {
+.profile-meta,
+.metric-sections,
+.report-sections {
   display: grid;
   gap: 14px;
+}
+
+.start-actions-card {
+  margin-bottom: 6px;
+}
+
+.start-actions-copy {
+  margin: 0 0 14px;
+  line-height: 1.55;
+  color: var(--hero-muted);
 }
 
 .glass-card,
@@ -214,6 +226,26 @@ textarea {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
+}
+
+.metric-section,
+.report-section {
+  display: grid;
+  gap: 16px;
+}
+
+.metric-section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-end;
+}
+
+.metric-section-copy {
+  max-width: 340px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .stat-card,
@@ -628,6 +660,11 @@ table td strong {
   gap: 14px;
 }
 
+#vehicleCard[hidden],
+#settingsCard[hidden] {
+  display: none;
+}
+
 .report-card {
   padding: 18px;
   border: 1px solid var(--line);
@@ -837,8 +874,10 @@ th {
 
   .command-header,
   .chart-card-head,
-  .report-card-head {
+  .report-card-head,
+  .metric-section-header {
     flex-direction: column;
+    align-items: flex-start;
   }
 
   .chart-switcher {
