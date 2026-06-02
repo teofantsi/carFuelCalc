@@ -1042,7 +1042,21 @@ function buildBackupCsv() {
 }
 
 function importBackupCsv(csvText) {
-  const rows = parseCsvRows(csvText);
+  const normalizedCsvText = String(csvText).replace(/^\uFEFF/, "");
+  const rows = parseCsvRows(normalizedCsvText);
+  const knownRecordTypes = new Set(["settings", "vehicle", "fillUp", "trip"]);
+  if (!rows.length) {
+    throw new Error("Empty backup.");
+  }
+
+  if (rows.some((row) => knownRecordTypes.has(row.recordType))) {
+    return importRoadLedgerRows(rows);
+  }
+
+  return importFuelioCsv(normalizedCsvText);
+}
+
+function importRoadLedgerRows(rows) {
   const imported = {
     session: { ...state.session },
     settings: { ...defaultState.settings },
@@ -1138,6 +1152,134 @@ function importBackupCsv(csvText) {
   }
 
   return mergeState(imported);
+}
+
+function importFuelioCsv(csvText) {
+  const sections = parseFuelioSections(csvText);
+  const vehicleRows = sections.Vehicle || [];
+  const logRows = sections.Log || [];
+
+  if (!vehicleRows.length || !logRows.length) {
+    throw new Error("Unsupported CSV format.");
+  }
+
+  const vehicles = vehicleRows.map((row, index) => {
+    const distanceUnit = parseFuelioDistanceUnit(row.DistUnit);
+    const fuelType = parseFuelioFuelType(row.Tank1Type);
+    return {
+      id: crypto.randomUUID(),
+      name: row.Name || row.Make || `Imported vehicle ${index + 1}`,
+      fuelType,
+      tankSize: parseNullableNumber(row.Tank1Capacity),
+      distanceUnit,
+      registrationNumber: row.Plate || "",
+      make: row.Make || "",
+      yearOfManufacture: parseNullableNumber(row.Year),
+      monthOfFirstRegistration: "",
+      engineCapacity: null,
+      co2Emissions: null,
+      estimatedConsumption: null,
+      lookupSource: "fuelio",
+    };
+  });
+
+  const primaryVehicle =
+    vehicles[vehicleRows.findIndex((row) => row.Active === "1")] || vehicles[0];
+  const odometerColumn = findFuelioColumn(logRows[0], "Odo");
+  const litersColumn = findFuelioColumn(logRows[0], "Fuel");
+  const imported = {
+    session: { ...state.session },
+    settings: {
+      ...defaultState.settings,
+      consumptionMode: primaryVehicle?.distanceUnit === "mi" ? "mpgUk" : "lPer100km",
+    },
+    vehicles,
+    fillUps: logRows.map((row) => {
+      const liters = parseNumberOrZero(row[litersColumn]);
+      const totalCost = parseNumberOrZero(row.Price);
+      const pricePerLiter = parseNullableNumber(row.VolumePrice);
+      return {
+        id: row.UniqueId ? `fuelio-${row.UniqueId}` : crypto.randomUUID(),
+        vehicleId: primaryVehicle?.id || "",
+        date: row.Date || "",
+        odometer: parseNumberOrZero(row[odometerColumn]),
+        liters,
+        totalCost,
+        pricePerLiter: pricePerLiter ?? (liters ? totalCost / liters : 0),
+        station: row.City || "",
+        isPartial: !parseFuelioBoolean(row.Full),
+        notes: row.Notes || "",
+        efficiency: parseNullableNumber(row.mpg),
+        weather: null,
+      };
+    }),
+    trips: [],
+    weatherCache: {},
+  };
+
+  return mergeState(imported);
+}
+
+function parseFuelioSections(csvText) {
+  const table = parseCsvTable(csvText);
+  const sections = {};
+  let currentSection = "";
+  let header = null;
+
+  for (const row of table) {
+    const firstCell = row[0] || "";
+    if (firstCell.startsWith("## ")) {
+      currentSection = firstCell.slice(3).trim();
+      header = null;
+      continue;
+    }
+
+    if (!currentSection || !row.some((cell) => cell !== "")) {
+      continue;
+    }
+
+    if (!header) {
+      header = row;
+      sections[currentSection] = [];
+      continue;
+    }
+
+    sections[currentSection].push(
+      Object.fromEntries(header.map((column, index) => [column, row[index] ?? ""]))
+    );
+  }
+
+  return sections;
+}
+
+function parseFuelioDistanceUnit(value) {
+  return String(value) === "1" ? "mi" : "km";
+}
+
+function parseFuelioFuelType(value) {
+  const fuelTypeMap = {
+    0: "Petrol",
+    100: "Petrol",
+    101: "Diesel",
+    102: "LPG",
+    103: "CNG",
+    104: "Ethanol",
+    105: "Electric",
+    106: "Hybrid",
+  };
+  return fuelTypeMap[Number(value)] || "Petrol";
+}
+
+function parseFuelioBoolean(value) {
+  return value === "1" || String(value).toLowerCase() === "true";
+}
+
+function findFuelioColumn(row, prefix) {
+  const key = Object.keys(row).find((column) => column.startsWith(prefix));
+  if (!key) {
+    throw new Error(`Missing ${prefix} column.`);
+  }
+  return key;
 }
 
 function buildEstimatedConsumption(row) {
