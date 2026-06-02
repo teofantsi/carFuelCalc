@@ -146,12 +146,8 @@ const elements = {
   themeToggleBtn: document.querySelector("#themeToggleBtn"),
   showVehicleSectionBtn: document.querySelector("#showVehicleSectionBtn"),
   showSettingsSectionBtn: document.querySelector("#showSettingsSectionBtn"),
-  vehicleCardToggleBtn: document.querySelector("#vehicleCardToggleBtn"),
-  settingsCardToggleBtn: document.querySelector("#settingsCardToggleBtn"),
   vehicleCard: document.querySelector("#vehicleCard"),
   settingsCard: document.querySelector("#settingsCard"),
-  vehicleCardContent: document.querySelector("#vehicleCardContent"),
-  settingsCardContent: document.querySelector("#settingsCardContent"),
 };
 
 void init();
@@ -184,12 +180,6 @@ function bindEvents() {
     toggleSection("vehicle")
   );
   elements.showSettingsSectionBtn.addEventListener("click", () =>
-    toggleSection("settings")
-  );
-  elements.vehicleCardToggleBtn.addEventListener("click", () =>
-    toggleSection("vehicle")
-  );
-  elements.settingsCardToggleBtn.addEventListener("click", () =>
     toggleSection("settings")
   );
   elements.vehicleForm.addEventListener("submit", handleVehicleSubmit);
@@ -868,8 +858,8 @@ function renderHeroChart(values, color, options = {}) {
         stroke-linejoin="round"
         points="${linePoints}"
       />
-      ${renderChartPoint(maxPoint, color, "Peak")}
-      ${renderChartPoint(minPoint, color, "Dip")}
+      ${renderChartPoint(maxPoint, "up")}
+      ${renderChartPoint(minPoint, "down")}
     </svg>
   `;
 }
@@ -982,12 +972,37 @@ function renderChartAxes({
   `;
 }
 
-function renderChartPoint(point, color, label) {
+function renderChartPoint(point, direction) {
+  const arrowColor = "var(--accent)";
+  const isUp = direction === "up";
+  const arrowHead = isUp
+    ? `${point.x - 3.5},${point.y - 6} ${point.x},${point.y - 10} ${point.x + 3.5},${point.y - 6}`
+    : `${point.x - 3.5},${point.y + 6} ${point.x},${point.y + 10} ${point.x + 3.5},${point.y + 6}`;
+  const stemY1 = isUp ? point.y - 2 : point.y + 2;
+  const stemY2 = isUp ? point.y - 8 : point.y + 8;
+
   return `
     <g class="chart-point">
-      <circle cx="${point.x}" cy="${point.y}" r="4.5" fill="${color}" />
-      <circle cx="${point.x}" cy="${point.y}" r="8" fill="${color}22" />
-      <text x="${point.x}" y="${Math.max(point.y - 10, 12)}" text-anchor="middle" class="chart-callout">${escapeHtml(label)}</text>
+      <circle cx="${point.x}" cy="${point.y}" r="3.2" fill="${arrowColor}" opacity="0.9" />
+      <line
+        x1="${point.x}"
+        y1="${stemY1}"
+        x2="${point.x}"
+        y2="${stemY2}"
+        stroke="${arrowColor}"
+        stroke-width="1.2"
+        stroke-linecap="round"
+        opacity="0.8"
+      />
+      <polyline
+        points="${arrowHead}"
+        fill="none"
+        stroke="${arrowColor}"
+        stroke-width="1.2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        opacity="0.8"
+      />
     </g>
   `;
 }
@@ -1189,21 +1204,13 @@ function buildReports(fillUps, trips) {
 }
 
 function renderSectionVisibility() {
-  elements.vehicleCardContent.hidden = !sectionVisibility.vehicle;
-  elements.settingsCardContent.hidden = !sectionVisibility.settings;
+  elements.vehicleCard.hidden = !sectionVisibility.vehicle;
+  elements.settingsCard.hidden = !sectionVisibility.settings;
   elements.showVehicleSectionBtn.setAttribute(
     "aria-expanded",
     String(sectionVisibility.vehicle)
   );
   elements.showSettingsSectionBtn.setAttribute(
-    "aria-expanded",
-    String(sectionVisibility.settings)
-  );
-  elements.vehicleCardToggleBtn.setAttribute(
-    "aria-expanded",
-    String(sectionVisibility.vehicle)
-  );
-  elements.settingsCardToggleBtn.setAttribute(
     "aria-expanded",
     String(sectionVisibility.settings)
   );
@@ -1213,12 +1220,6 @@ function renderSectionVisibility() {
   elements.showSettingsSectionBtn.textContent = sectionVisibility.settings
     ? "Close settings"
     : "Open settings";
-  elements.vehicleCardToggleBtn.textContent = sectionVisibility.vehicle
-    ? "Close"
-    : "Open";
-  elements.settingsCardToggleBtn.textContent = sectionVisibility.settings
-    ? "Close"
-    : "Open";
 }
 
 function revealSection(sectionKey) {
