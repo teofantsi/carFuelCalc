@@ -540,7 +540,7 @@ function renderCharts() {
       <article class="chart-card chart-card-hero">
         <div class="command-header">
           <div>
-            <div class="command-label">Option A</div>
+            <div class="command-label">Overview</div>
             <h3>${escapeHtml(heroChart.title)}</h3>
             <div class="chart-meta">${escapeHtml(heroChart.meta)}</div>
           </div>
