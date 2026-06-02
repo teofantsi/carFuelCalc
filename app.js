@@ -962,8 +962,13 @@ function importBackup(event) {
       render();
       void syncRemoteState();
       void refreshWeatherSummary();
-    } catch {
-      alert("That CSV backup file could not be read.");
+    } catch (error) {
+      console.error("CSV import failed", error);
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "That CSV backup file could not be read.";
+      alert(`CSV import failed: ${message}`);
     }
   };
   reader.readAsText(file);
