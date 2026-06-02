@@ -372,6 +372,7 @@ function renderVehicleList() {
   elements.vehicleList.innerHTML = state.vehicles
     .map((vehicle) => {
       const tripCount = state.trips.filter((trip) => trip.vehicleId === vehicle.id).length;
+      const costTotals = getVehicleCostTotals(vehicle.id);
       const registrationMeta = vehicle.registrationNumber
         ? ` · ${escapeHtml(formatRegistrationForDisplay(vehicle.registrationNumber))}`
         : "";
@@ -384,6 +385,7 @@ function renderVehicleList() {
               vehicle.tankSize ? ` · ${vehicle.tankSize}L tank` : ""
             }${registrationMeta}</span>
             ${consumptionMeta ? `<span class="meta">${escapeHtml(consumptionMeta)}</span>` : ""}
+            <span class="meta">This year ${formatCurrency(costTotals.currentYearTotal)} · All time ${formatCurrency(costTotals.allTimeTotal)}</span>
           </div>
           <div class="list-item-actions">
             <span class="chip">${countVehicleEntries(vehicle.id)} fill-ups · ${tripCount} trips</span>
@@ -766,7 +768,6 @@ function renderHeroChart(values, color, options = {}) {
     return { x, y, value };
   });
   const linePoints = points.map((point) => `${point.x},${point.y}`).join(" ");
-  const areaPoints = [`${points[0].x},${areaBaseY}`, linePoints, `${points.at(-1).x},${areaBaseY}`].join(" ");
   const maxPoint = points.reduce((best, point) => (point.value > best.value ? point : best), points[0]);
   const minPoint = points.reduce((best, point) => (point.value < best.value ? point : best), points[0]);
   const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
@@ -787,11 +788,11 @@ function renderHeroChart(values, color, options = {}) {
         yTop: 28,
         textOffset: 4,
       })}
-      <polygon fill="${color}18" points="${areaPoints}" />
       <polyline
         fill="none"
-        stroke="${color}33"
-        stroke-width="10"
+        stroke="${color}"
+        stroke-opacity="0.16"
+        stroke-width="6"
         stroke-linecap="round"
         stroke-linejoin="round"
         points="${linePoints}"
@@ -799,7 +800,7 @@ function renderHeroChart(values, color, options = {}) {
       <polyline
         fill="none"
         stroke="${color}"
-        stroke-width="4"
+        stroke-width="2.25"
         stroke-linecap="round"
         stroke-linejoin="round"
         points="${linePoints}"
@@ -838,8 +839,9 @@ function renderLineChart(values, color, options = {}) {
       })}
       <polyline
         fill="none"
-        stroke="${color}33"
-        stroke-width="8"
+        stroke="${color}"
+        stroke-opacity="0.14"
+        stroke-width="5"
         stroke-linecap="round"
         stroke-linejoin="round"
         points="${points}"
@@ -847,7 +849,7 @@ function renderLineChart(values, color, options = {}) {
       <polyline
         fill="none"
         stroke="${color}"
-        stroke-width="3"
+        stroke-width="1.8"
         stroke-linecap="round"
         stroke-linejoin="round"
         points="${points}"
@@ -1094,10 +1096,12 @@ function summarizeVehicleComparison(fillUps, trips) {
     const vehicleTrips = trips.filter((trip) => trip.vehicleId === selectedVehicle);
     const vehicleOwnershipCosts = state.ownershipCosts.filter((cost) => cost.vehicleId === selectedVehicle);
     const totals = summarizeEntries(vehicleFillUps, vehicleTrips, vehicleOwnershipCosts);
+    const costTotals = getVehicleCostTotals(selectedVehicle);
     return {
       badge: vehicle?.name || "Vehicle view",
       metrics: [
-        { label: "Spend", value: formatCurrency(totals.totalSpend) },
+        { label: "All-time cost", value: formatCurrency(costTotals.allTimeTotal) },
+        { label: "This year", value: formatCurrency(costTotals.currentYearTotal) },
         { label: "Distance", value: formatDistance(totals.tripDistance, totals.distanceUnit) },
         { label: "Avg efficiency", value: totals.averageEfficiencyLabel },
         { label: "Fill-ups", value: String(vehicleFillUps.length) },
@@ -3011,6 +3015,26 @@ function getVehicleById(vehicleId) {
 function getGarageDistanceUnit() {
   const units = new Set(state.vehicles.map((vehicle) => vehicle.distanceUnit || "km"));
   return units.size === 1 ? [...units][0] : "km";
+}
+
+function getVehicleCostTotals(vehicleId) {
+  const currentYear = getLocalDateString().slice(0, 4);
+  const relatedItems = [
+    ...state.fillUps.filter((entry) => entry.vehicleId === vehicleId),
+    ...state.trips.filter((trip) => trip.vehicleId === vehicleId),
+    ...state.ownershipCosts.filter((cost) => cost.vehicleId === vehicleId),
+  ];
+
+  const allTimeTotal = relatedItems.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+  const currentYearTotal = relatedItems
+    .filter((item) => item.date?.slice(0, 4) === currentYear)
+    .reduce((sum, item) => sum + (item.totalCost || 0), 0);
+
+  return {
+    currentYear,
+    currentYearTotal,
+    allTimeTotal,
+  };
 }
 
 function buildOwnershipYearBreakdown(costs) {
