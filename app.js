@@ -891,7 +891,7 @@ function renderHeroChart(values, color, options = {}) {
         fill="none"
         stroke="${color}"
         stroke-opacity="0.16"
-        stroke-width="6"
+        stroke-width="4"
         stroke-linecap="round"
         stroke-linejoin="round"
         points="${linePoints}"
@@ -899,7 +899,7 @@ function renderHeroChart(values, color, options = {}) {
       <polyline
         fill="none"
         stroke="${color}"
-        stroke-width="2.25"
+        stroke-width="1.6"
         stroke-linecap="round"
         stroke-linejoin="round"
         points="${linePoints}"
@@ -941,7 +941,7 @@ function renderLineChart(values, color, options = {}) {
         fill="none"
         stroke="${color}"
         stroke-opacity="0.14"
-        stroke-width="5"
+        stroke-width="3.5"
         stroke-linecap="round"
         stroke-linejoin="round"
         points="${points}"
@@ -949,7 +949,7 @@ function renderLineChart(values, color, options = {}) {
       <polyline
         fill="none"
         stroke="${color}"
-        stroke-width="1.8"
+        stroke-width="1.25"
         stroke-linecap="round"
         stroke-linejoin="round"
         points="${points}"
@@ -1020,36 +1020,12 @@ function renderChartAxes({
 }
 
 function renderChartPoint(point, direction) {
-  const arrowColor = "var(--accent)";
-  const isUp = direction === "up";
-  const arrowHead = isUp
-    ? `${point.x - 3.5},${point.y - 6} ${point.x},${point.y - 10} ${point.x + 3.5},${point.y - 6}`
-    : `${point.x - 3.5},${point.y + 6} ${point.x},${point.y + 10} ${point.x + 3.5},${point.y + 6}`;
-  const stemY1 = isUp ? point.y - 2 : point.y + 2;
-  const stemY2 = isUp ? point.y - 8 : point.y + 8;
+  const dotColor = direction === "up" ? "var(--sage)" : "var(--warn)";
 
   return `
     <g class="chart-point">
-      <circle cx="${point.x}" cy="${point.y}" r="3.2" fill="${arrowColor}" opacity="0.9" />
-      <line
-        x1="${point.x}"
-        y1="${stemY1}"
-        x2="${point.x}"
-        y2="${stemY2}"
-        stroke="${arrowColor}"
-        stroke-width="1.2"
-        stroke-linecap="round"
-        opacity="0.8"
-      />
-      <polyline
-        points="${arrowHead}"
-        fill="none"
-        stroke="${arrowColor}"
-        stroke-width="1.2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        opacity="0.8"
-      />
+      <circle cx="${point.x}" cy="${point.y}" r="5.25" fill="${dotColor}" opacity="0.18" />
+      <circle cx="${point.x}" cy="${point.y}" r="3.1" fill="${dotColor}" />
     </g>
   `;
 }
