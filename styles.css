@@ -292,6 +292,14 @@ textarea {
   margin-bottom: 18px;
 }
 
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
 .section-heading.compact {
   margin-bottom: 12px;
 }
@@ -336,6 +344,11 @@ textarea {
   background: rgba(41, 33, 22, 0.08);
   color: var(--ink);
   border: 1px solid var(--line);
+}
+
+[data-fold-content] {
+  display: grid;
+  gap: 16px;
 }
 
 .primary-button {

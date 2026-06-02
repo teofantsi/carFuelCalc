@@ -130,19 +130,43 @@
                 <p class="eyebrow">Dashboard</p>
                 <h2>Fuel and travel trends</h2>
               </div>
-              <select id="vehicleFilter" aria-label="Filter by vehicle"></select>
-            </div>
-
-            <div class="chart-grid" id="chartGrid"></div>
-            <div id="insightList" class="insight-list"></div>
-
-            <div class="section-heading reports-heading">
-              <div>
-                <p class="eyebrow">Reports</p>
-                <h2>Monthly and yearly breakdowns</h2>
+              <div class="section-actions">
+                <select id="vehicleFilter" aria-label="Filter by vehicle"></select>
+                <button
+                  class="ghost-button dark-ghost section-toggle"
+                  type="button"
+                  data-fold-toggle="dashboard"
+                  aria-controls="dashboardContent"
+                  aria-expanded="true"
+                >
+                  Hide
+                </button>
               </div>
             </div>
-            <div id="reportGrid" class="report-sections"></div>
+
+            <div id="dashboardContent" data-fold-content="dashboard">
+              <div class="chart-grid" id="chartGrid"></div>
+              <div id="insightList" class="insight-list"></div>
+
+              <div class="section-heading reports-heading">
+                <div>
+                  <p class="eyebrow">Reports</p>
+                  <h2>Monthly and yearly breakdowns</h2>
+                </div>
+                <button
+                  class="ghost-button dark-ghost section-toggle"
+                  type="button"
+                  data-fold-toggle="reports"
+                  aria-controls="reportsContent"
+                  aria-expanded="true"
+                >
+                  Hide
+                </button>
+              </div>
+              <div id="reportsContent" data-fold-content="reports">
+                <div id="reportGrid" class="report-sections"></div>
+              </div>
+            </div>
           </article>
 
           <article id="vehicleCard" class="card" hidden>
@@ -221,7 +245,17 @@
                 <p class="eyebrow">Fuel Log</p>
                 <h2>Add a fill-up</h2>
               </div>
+              <button
+                class="ghost-button dark-ghost section-toggle"
+                type="button"
+                data-fold-toggle="fillUps"
+                aria-controls="fillUpsContent"
+                aria-expanded="true"
+              >
+                Hide
+              </button>
             </div>
+            <div id="fillUpsContent" data-fold-content="fillUps">
             <form id="fillUpForm" class="form-grid">
               <label>
                 Vehicle
@@ -271,6 +305,7 @@
               </div>
               <button type="submit" class="primary-button">Save fill-up</button>
             </form>
+            </div>
           </article>
 
           <article class="card wide">
@@ -279,7 +314,17 @@
                 <p class="eyebrow">Trip Log</p>
                 <h2>Add a trip</h2>
               </div>
+              <button
+                class="ghost-button dark-ghost section-toggle"
+                type="button"
+                data-fold-toggle="trips"
+                aria-controls="tripsContent"
+                aria-expanded="true"
+              >
+                Hide
+              </button>
             </div>
+            <div id="tripsContent" data-fold-content="trips">
             <form id="tripForm" class="form-grid">
               <label>
                 Vehicle
@@ -338,6 +383,7 @@
               </label>
               <button type="submit" class="primary-button">Save trip</button>
             </form>
+            </div>
           </article>
 
           <article class="card wide">
@@ -346,7 +392,17 @@
                 <p class="eyebrow">Ownership Costs</p>
                 <h2>Log yearly car costs</h2>
               </div>
+              <button
+                class="ghost-button dark-ghost section-toggle"
+                type="button"
+                data-fold-toggle="ownership"
+                aria-controls="ownershipContent"
+                aria-expanded="true"
+              >
+                Hide
+              </button>
             </div>
+            <div id="ownershipContent" data-fold-content="ownership">
             <form id="ownershipCostForm" class="form-grid">
               <label>
                 Vehicle
@@ -401,6 +457,7 @@
                 <tbody id="ownershipBreakdownBody"></tbody>
               </table>
             </div>
+            </div>
           </article>
 
           <article class="card wide">
@@ -409,7 +466,17 @@
                 <p class="eyebrow">Fuel History</p>
                 <h2>Recent fill-ups</h2>
               </div>
+              <button
+                class="ghost-button dark-ghost section-toggle"
+                type="button"
+                data-fold-toggle="fuelHistory"
+                aria-controls="fuelHistoryContent"
+                aria-expanded="true"
+              >
+                Hide
+              </button>
             </div>
+            <div id="fuelHistoryContent" data-fold-content="fuelHistory">
             <div class="table-wrap">
               <table>
                 <thead>
@@ -427,6 +494,7 @@
                 <tbody id="fillUpTableBody"></tbody>
               </table>
             </div>
+            </div>
           </article>
 
           <article class="card wide">
@@ -435,7 +503,17 @@
                 <p class="eyebrow">Trip History</p>
                 <h2>Recent trips</h2>
               </div>
+              <button
+                class="ghost-button dark-ghost section-toggle"
+                type="button"
+                data-fold-toggle="tripHistory"
+                aria-controls="tripHistoryContent"
+                aria-expanded="true"
+              >
+                Hide
+              </button>
             </div>
+            <div id="tripHistoryContent" data-fold-content="tripHistory">
             <div class="table-wrap">
               <table>
                 <thead>
@@ -453,6 +531,7 @@
                 <tbody id="tripTableBody"></tbody>
               </table>
             </div>
+            </div>
           </article>
 
           <article class="card wide">
@@ -461,7 +540,17 @@
                 <p class="eyebrow">Ownership History</p>
                 <h2>Recent car costs</h2>
               </div>
+              <button
+                class="ghost-button dark-ghost section-toggle"
+                type="button"
+                data-fold-toggle="ownershipHistory"
+                aria-controls="ownershipHistoryContent"
+                aria-expanded="true"
+              >
+                Hide
+              </button>
             </div>
+            <div id="ownershipHistoryContent" data-fold-content="ownershipHistory">
             <div class="table-wrap">
               <table>
                 <thead>
@@ -476,6 +565,7 @@
                 </thead>
                 <tbody id="ownershipCostTableBody"></tbody>
               </table>
+            </div>
             </div>
           </article>
 

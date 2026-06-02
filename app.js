@@ -108,6 +108,16 @@ const sectionVisibility = {
   vehicle: false,
   settings: false,
 };
+const foldableSectionState = {
+  dashboard: true,
+  reports: true,
+  fillUps: true,
+  trips: true,
+  ownership: true,
+  fuelHistory: true,
+  tripHistory: true,
+  ownershipHistory: true,
+};
 
 const elements = {
   statsGrid: document.querySelector("#statsGrid"),
@@ -182,6 +192,11 @@ function bindEvents() {
   elements.showSettingsSectionBtn.addEventListener("click", () =>
     toggleSection("settings")
   );
+  for (const button of document.querySelectorAll("[data-fold-toggle]")) {
+    button.addEventListener("click", () =>
+      toggleFoldableSection(button.dataset.foldToggle)
+    );
+  }
   elements.vehicleForm.addEventListener("submit", handleVehicleSubmit);
   elements.plateLookupBtn.addEventListener("click", () => void handlePlateLookup());
   elements.vehicleForm.registrationNumber.addEventListener("input", handleRegistrationInput);
@@ -276,6 +291,7 @@ function render() {
   renderVehicleOptions();
   renderProfile();
   renderSectionVisibility();
+  renderFoldableSections();
   renderVehicleList();
   renderStats();
   renderCharts();
@@ -1220,6 +1236,27 @@ function renderSectionVisibility() {
   elements.showSettingsSectionBtn.textContent = sectionVisibility.settings
     ? "Close settings"
     : "Open settings";
+}
+
+function renderFoldableSections() {
+  for (const button of document.querySelectorAll("[data-fold-toggle]")) {
+    const sectionKey = button.dataset.foldToggle;
+    const content = document.querySelector(`[data-fold-content="${sectionKey}"]`);
+    const isExpanded = foldableSectionState[sectionKey] !== false;
+    if (content) {
+      content.hidden = !isExpanded;
+    }
+    button.setAttribute("aria-expanded", String(isExpanded));
+    button.textContent = isExpanded ? "Hide" : "Show";
+  }
+}
+
+function toggleFoldableSection(sectionKey) {
+  if (!(sectionKey in foldableSectionState)) {
+    return;
+  }
+  foldableSectionState[sectionKey] = !foldableSectionState[sectionKey];
+  renderFoldableSections();
 }
 
 function revealSection(sectionKey) {
