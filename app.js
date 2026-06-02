@@ -660,22 +660,27 @@ function renderChartMetrics(metrics) {
 }
 
 function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUnit, tripVehicleUnit) {
-  const efficiencyValues = fillUps
-    .filter((entry) => Number.isFinite(entry.efficiency))
-    .map((entry) =>
-      normalizeEfficiency(
-        entry.efficiency,
-        getVehicleById(entry.vehicleId)?.distanceUnit || fillUpVehicleUnit
-      )
-    );
-  const priceValues = fillUps
-    .map((entry) => entry.pricePerLiter)
-    .filter((value) => Number.isFinite(value));
+  const efficiencyEntries = fillUps.filter((entry) => Number.isFinite(entry.efficiency));
+  const efficiencyValues = efficiencyEntries.map((entry) =>
+    normalizeEfficiency(
+      entry.efficiency,
+      getVehicleById(entry.vehicleId)?.distanceUnit || fillUpVehicleUnit
+    )
+  );
+  const efficiencyLabels = efficiencyEntries.map((entry) => formatChartDateLabel(entry.date));
+  const priceValues = fillUps.map((entry) => entry.pricePerLiter).filter((value) => Number.isFinite(value));
+  const priceLabels = fillUps
+    .filter((entry) => Number.isFinite(entry.pricePerLiter))
+    .map((entry) => formatChartDateLabel(entry.date));
   const monthlySpendSeries = buildMonthlySpendSeries(fillUps, trips, ownershipCosts);
   const monthlySpendValues = monthlySpendSeries.map((item) => item.value);
+  const monthlySpendLabels = monthlySpendSeries.map((item) => item.label);
   const tripDistanceValues = trips
     .map((trip) => normalizeTripDistance(trip, tripVehicleUnit))
     .filter((value) => Number.isFinite(value));
+  const tripDistanceLabels = trips
+    .filter((trip) => Number.isFinite(normalizeTripDistance(trip, tripVehicleUnit)))
+    .map((trip) => formatChartDateLabel(trip.date));
 
   return [
     {
@@ -689,8 +694,7 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       highlight: buildEfficiencyMetrics(efficiencyValues)[0]?.value || "Pending",
       options: {
         yFormatter: (value) => formatAxisNumber(value, 1),
-        xStartLabel: "Start",
-        xEndLabel: "Now",
+        xLabels: efficiencyLabels,
       },
     },
     {
@@ -704,8 +708,7 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       highlight: buildPriceMetrics(priceValues)[0]?.value || "Pending",
       options: {
         yFormatter: (value) => formatCurrency(value),
-        xStartLabel: "Start",
-        xEndLabel: "Now",
+        xLabels: priceLabels,
         yDomain: buildReactiveRange(priceValues, {
           paddingRatio: 0.08,
           minimumPadding: 0.005,
@@ -723,8 +726,7 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       highlight: buildMonthlySpendMetrics(monthlySpendValues)[0]?.value || "Pending",
       options: {
         yFormatter: (value) => formatCurrency(value),
-        xStartLabel: monthlySpendSeries[0]?.label || "Start",
-        xEndLabel: monthlySpendSeries.at(-1)?.label || "Now",
+        xLabels: monthlySpendLabels,
       },
     },
     {
@@ -738,8 +740,7 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       highlight: buildTripDistanceMetrics(tripDistanceValues, tripVehicleUnit)[0]?.value || "Pending",
       options: {
         yFormatter: (value) => formatAxisDistance(value, tripVehicleUnit),
-        xStartLabel: "Start",
-        xEndLabel: "Now",
+        xLabels: tripDistanceLabels,
       },
     },
   ];
@@ -879,8 +880,11 @@ function renderHeroChart(values, color, options = {}) {
         minLabel: yFormatter(min),
         midLabel: yFormatter(mid),
         maxLabel: yFormatter(max),
-        xStartLabel: options.xStartLabel || "1",
-        xEndLabel: options.xEndLabel || String(values.length),
+        xTicks: buildDistributedXAxisTicks(options.xLabels || [], {
+          startX: 28,
+          endX: 154,
+          maxTicks: 3,
+        }),
         width: 180,
         x1: 28,
         x2: 154,
@@ -936,8 +940,11 @@ function renderLineChart(values, color, options = {}) {
         minLabel: yFormatter(min),
         midLabel: yFormatter(mid),
         maxLabel: yFormatter(max),
-        xStartLabel: options.xStartLabel || "1",
-        xEndLabel: options.xEndLabel || String(values.length),
+        xTicks: buildDistributedXAxisTicks(options.xLabels || [], {
+          startX: 32,
+          endX: 150,
+          maxTicks: 3,
+        }),
       })}
       <polyline
         fill="none"
@@ -984,8 +991,7 @@ function renderBarChart(values, color, options = {}) {
         minLabel: yFormatter(0),
         midLabel: yFormatter(mid),
         maxLabel: yFormatter(max),
-        xStartLabel: options.xStartLabel || "1",
-        xEndLabel: options.xEndLabel || String(values.length),
+        xTicks: buildBarXAxisTicks((options.xLabels || []).slice(-8)),
       })}
       ${bars}
     </svg>
@@ -996,8 +1002,7 @@ function renderChartAxes({
   minLabel,
   midLabel,
   maxLabel,
-  xStartLabel,
-  xEndLabel,
+  xTicks = [],
   width = 160,
   x1 = 30,
   x2 = 150,
@@ -1015,8 +1020,7 @@ function renderChartAxes({
       <text x="${x1 - textOffset}" y="${yBottom + 2}" text-anchor="end" class="chart-axis-text">${escapeHtml(minLabel)}</text>
       <text x="${x1 - textOffset}" y="${yMid + 2}" text-anchor="end" class="chart-axis-text">${escapeHtml(midLabel)}</text>
       <text x="${x1 - textOffset}" y="${yTop + 2}" text-anchor="end" class="chart-axis-text">${escapeHtml(maxLabel)}</text>
-      <text x="${x1}" y="${yBottom + 18}" class="chart-axis-text">${escapeHtml(xStartLabel)}</text>
-      <text x="${Math.min(x2, width - 10)}" y="${yBottom + 18}" text-anchor="end" class="chart-axis-text">${escapeHtml(xEndLabel)}</text>
+      ${renderXAxisTicks(xTicks, yBottom + 18)}
     </g>
   `;
 }
@@ -3936,6 +3940,71 @@ function buildReactiveRange(values, options = {}) {
     min: Math.max(0, rawMin - padding),
     max: rawMax + padding,
   };
+}
+
+function renderXAxisTicks(ticks, y) {
+  if (!ticks.length) {
+    return "";
+  }
+
+  return ticks
+    .map(
+      (tick) => `
+        <text x="${tick.x}" y="${y}" text-anchor="${tick.anchor || "middle"}" class="chart-axis-text">${escapeHtml(tick.label)}</text>
+      `
+    )
+    .join("");
+}
+
+function buildDistributedXAxisTicks(labels, options = {}) {
+  if (!labels.length) {
+    return [];
+  }
+
+  const maxTicks = options.maxTicks || 3;
+  const indexes = Array.from(
+    new Set(
+      [0, Math.floor((labels.length - 1) / 2), labels.length - 1].slice(0, maxTicks)
+    )
+  ).sort((a, b) => a - b);
+
+  return indexes.map((index) => {
+    const ratio = labels.length === 1 ? 0 : index / (labels.length - 1);
+    const x = options.startX + ratio * (options.endX - options.startX);
+    return {
+      x,
+      label: labels[index],
+      anchor: index === 0 ? "start" : index === labels.length - 1 ? "end" : "middle",
+    };
+  });
+}
+
+function buildBarXAxisTicks(labels) {
+  if (!labels.length) {
+    return [];
+  }
+
+  const indexes = Array.from(
+    new Set([0, Math.floor((labels.length - 1) / 2), labels.length - 1])
+  ).sort((a, b) => a - b);
+  const barWidth = 112 / labels.length;
+
+  return indexes.map((index) => ({
+    x: 34 + index * barWidth + barWidth / 2,
+    label: labels[index],
+    anchor: index === 0 ? "start" : index === labels.length - 1 ? "end" : "middle",
+  }));
+}
+
+function formatChartDateLabel(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(value));
 }
 
 function roundMaybe(value, digits) {
