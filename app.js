@@ -582,8 +582,8 @@ function renderLineChart(values, color, options = {}) {
   const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
   const points = values
     .map((value, index) => {
-      const x = 26 + (index / Math.max(values.length - 1, 1)) * 124;
-      const y = 76 - ((value - min) / Math.max(max - min, 1)) * 46;
+      const x = 32 + (index / Math.max(values.length - 1, 1)) * 118;
+      const y = 74 - ((value - min) / Math.max(max - min, 1)) * 54;
       return `${x},${y}`;
     })
     .join(" ");
@@ -628,9 +628,9 @@ function renderBarChart(values, color, options = {}) {
   const bars = values
     .slice(-8)
     .map((value, index, series) => {
-      const barWidth = 118 / series.length;
-      const x = 30 + index * barWidth;
-      const height = (value / max) * 50;
+      const barWidth = 112 / series.length;
+      const x = 34 + index * barWidth;
+      const height = (value / max) * 58;
       return `<rect x="${x}" y="${86 - height}" width="${Math.max(barWidth - 2, 4)}" height="${height}" rx="3" fill="${color}" opacity="0.86" />`;
     })
     .join("");
@@ -652,15 +652,15 @@ function renderBarChart(values, color, options = {}) {
 function renderChartAxes({ minLabel, midLabel, maxLabel, xStartLabel, xEndLabel }) {
   return `
     <g class="chart-axis-group">
-      <line x1="26" y1="76" x2="150" y2="76" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
-      <line x1="26" y1="53" x2="150" y2="53" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
-      <line x1="26" y1="30" x2="150" y2="30" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
-      <line x1="26" y1="76" x2="150" y2="76" stroke="var(--chart-axis)" stroke-width="1" />
-      <text x="22" y="78" text-anchor="end" class="chart-axis-text">${escapeHtml(minLabel)}</text>
-      <text x="22" y="55" text-anchor="end" class="chart-axis-text">${escapeHtml(midLabel)}</text>
-      <text x="22" y="32" text-anchor="end" class="chart-axis-text">${escapeHtml(maxLabel)}</text>
-      <text x="26" y="90" class="chart-axis-text">${escapeHtml(xStartLabel)}</text>
-      <text x="150" y="90" text-anchor="end" class="chart-axis-text">${escapeHtml(xEndLabel)}</text>
+      <line x1="30" y1="74" x2="150" y2="74" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="30" y1="48" x2="150" y2="48" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="30" y1="22" x2="150" y2="22" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="30" y1="74" x2="150" y2="74" stroke="var(--chart-axis)" stroke-width="1" />
+      <text x="26" y="76" text-anchor="end" class="chart-axis-text">${escapeHtml(minLabel)}</text>
+      <text x="26" y="50" text-anchor="end" class="chart-axis-text">${escapeHtml(midLabel)}</text>
+      <text x="26" y="24" text-anchor="end" class="chart-axis-text">${escapeHtml(maxLabel)}</text>
+      <text x="30" y="92" class="chart-axis-text">${escapeHtml(xStartLabel)}</text>
+      <text x="150" y="92" text-anchor="end" class="chart-axis-text">${escapeHtml(xEndLabel)}</text>
     </g>
   `;
 }
