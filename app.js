@@ -2166,14 +2166,13 @@ async function callApi(action, payload = {}) {
     headers: {
       "Content-Type": "application/json",
       apikey: SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
     },
     body: JSON.stringify({ action, ...payload }),
   });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error || "Request failed.");
+    throw new Error(data.error || data.message || "Request failed.");
   }
   return data;
 }
