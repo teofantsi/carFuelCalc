@@ -391,7 +391,8 @@ function renderCharts() {
   const priceValues = fillUps
     .map((entry) => entry.pricePerLiter)
     .filter((value) => Number.isFinite(value));
-  const monthlySpendValues = buildMonthlySpendSeries(fillUps, trips);
+  const monthlySpendSeries = buildMonthlySpendSeries(fillUps, trips);
+  const monthlySpendValues = monthlySpendSeries.map((item) => item.value);
   const tripDistanceValues = trips
     .map((trip) => normalizeTripDistance(trip, tripVehicleUnit))
     .filter((value) => Number.isFinite(value));
@@ -401,25 +402,42 @@ function renderCharts() {
       "Efficiency",
       state.settings.consumptionMode.toUpperCase(),
       buildEfficiencyMetrics(efficiencyValues),
-      renderLineChart(efficiencyValues, "var(--accent)")
+      renderLineChart(efficiencyValues, "var(--accent)", {
+        yFormatter: (value) =>
+          formatEfficiencyFromNormalized(value, state.settings.consumptionMode),
+        xStartLabel: "First",
+        xEndLabel: "Latest",
+      })
     ),
     renderChartCard(
       "Fuel price trend",
       "Price per litre",
       buildPriceMetrics(priceValues),
-      renderLineChart(priceValues, "var(--sky)")
+      renderLineChart(priceValues, "var(--sky)", {
+        yFormatter: (value) => `${formatCurrency(value)}/L`,
+        xStartLabel: "First",
+        xEndLabel: "Latest",
+      })
     ),
     renderChartCard(
       "Monthly spend",
       "Fuel + trip extras",
       buildMonthlySpendMetrics(monthlySpendValues),
-      renderBarChart(monthlySpendValues, "var(--sage)")
+      renderBarChart(monthlySpendValues, "var(--sage)", {
+        yFormatter: (value) => formatCurrency(value),
+        xStartLabel: monthlySpendSeries[0]?.label || "Start",
+        xEndLabel: monthlySpendSeries.at(-1)?.label || "Latest",
+      })
     ),
     renderChartCard(
       "Trip distance",
       tripVehicleUnit === "mi" ? "Miles per trip" : "Kilometres per trip",
       buildTripDistanceMetrics(tripDistanceValues, tripVehicleUnit),
-      renderBarChart(tripDistanceValues, "var(--warn)")
+      renderBarChart(tripDistanceValues, "var(--warn)", {
+        yFormatter: (value) => formatDistance(value, tripVehicleUnit),
+        xStartLabel: "First",
+        xEndLabel: "Latest",
+      })
     ),
   ];
 
@@ -554,23 +572,32 @@ function buildTripDistanceMetrics(values, unit) {
   ];
 }
 
-function renderLineChart(values, color) {
+function renderLineChart(values, color, options = {}) {
   if (values.length < 2) {
     return '<p class="empty">More data will draw this chart.</p>';
   }
 
   const min = Math.min(...values);
   const max = Math.max(...values);
+  const mid = min + (max - min) / 2;
+  const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
   const points = values
     .map((value, index) => {
-      const x = 8 + (index / Math.max(values.length - 1, 1)) * 84;
-      const y = 86 - ((value - min) / Math.max(max - min, 1)) * 58;
+      const x = 12 + (index / Math.max(values.length - 1, 1)) * 76;
+      const y = 78 - ((value - min) / Math.max(max - min, 1)) * 50;
       return `${x},${y}`;
     })
     .join(" ");
 
   return `
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      ${renderChartAxes({
+        minLabel: yFormatter(min),
+        midLabel: yFormatter(mid),
+        maxLabel: yFormatter(max),
+        xStartLabel: options.xStartLabel || "1",
+        xEndLabel: options.xEndLabel || String(values.length),
+      })}
       <polyline
         fill="none"
         stroke="${color}33"
@@ -591,27 +618,51 @@ function renderLineChart(values, color) {
   `;
 }
 
-function renderBarChart(values, color) {
+function renderBarChart(values, color, options = {}) {
   if (!values.length) {
     return '<p class="empty">More data will draw this chart.</p>';
   }
 
   const max = Math.max(...values, 1);
+  const mid = max / 2;
+  const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
   const bars = values
     .slice(-8)
     .map((value, index, series) => {
-      const barWidth = 80 / series.length;
-      const x = 10 + index * barWidth;
-      const height = (value / max) * 62;
+      const barWidth = 72 / series.length;
+      const x = 14 + index * barWidth;
+      const height = (value / max) * 54;
       return `<rect x="${x}" y="${86 - height}" width="${Math.max(barWidth - 2, 4)}" height="${height}" rx="3" fill="${color}" opacity="0.86" />`;
     })
     .join("");
 
   return `
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      <line x1="8" y1="86" x2="94" y2="86" stroke="var(--chart-axis)" stroke-width="1" />
+      ${renderChartAxes({
+        minLabel: yFormatter(0),
+        midLabel: yFormatter(mid),
+        maxLabel: yFormatter(max),
+        xStartLabel: options.xStartLabel || "1",
+        xEndLabel: options.xEndLabel || String(values.length),
+      })}
       ${bars}
     </svg>
+  `;
+}
+
+function renderChartAxes({ minLabel, midLabel, maxLabel, xStartLabel, xEndLabel }) {
+  return `
+    <g class="chart-axis-group">
+      <line x1="12" y1="78" x2="88" y2="78" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="12" y1="53" x2="88" y2="53" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="12" y1="28" x2="88" y2="28" stroke="var(--chart-axis-soft)" stroke-width="0.8" />
+      <line x1="12" y1="78" x2="88" y2="78" stroke="var(--chart-axis)" stroke-width="1" />
+      <text x="2" y="80" class="chart-axis-text">${escapeHtml(minLabel)}</text>
+      <text x="2" y="55" class="chart-axis-text">${escapeHtml(midLabel)}</text>
+      <text x="2" y="30" class="chart-axis-text">${escapeHtml(maxLabel)}</text>
+      <text x="12" y="92" class="chart-axis-text">${escapeHtml(xStartLabel)}</text>
+      <text x="88" y="92" text-anchor="end" class="chart-axis-text">${escapeHtml(xEndLabel)}</text>
+    </g>
   `;
 }
 
@@ -1755,7 +1806,7 @@ function buildMonthlySpendSeries(fillUps, trips) {
   return [...bucket.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .slice(-8)
-    .map(([, value]) => value);
+    .map(([month, value]) => ({ label: formatMonthLabel(month), value }));
 }
 
 function getFilteredFillUps() {
@@ -2164,6 +2215,15 @@ function formatDateTime(value) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatMonthLabel(value) {
+  const [year, month] = value.split("-");
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    year: "2-digit",
+  }).format(date);
 }
 
 function roundMaybe(value, digits) {
