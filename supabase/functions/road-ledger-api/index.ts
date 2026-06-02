@@ -11,6 +11,7 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   { auth: { persistSession: false } }
 );
+const dvlaApiKey = Deno.env.get("DVLA_VES_API_KEY") ?? "";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -24,6 +25,102 @@ function jsonResponse(body: unknown, status = 200) {
 
 function normalizeNickname(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function normalizeRegistration(value: string) {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function round(value: number, digits = 1) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+function estimateConsumptionFromCo2(fuelType: string, co2Emissions: unknown) {
+  const co2 = Number(co2Emissions);
+  if (!Number.isFinite(co2) || co2 <= 0) {
+    return null;
+  }
+
+  const normalizedFuelType = fuelType.toUpperCase();
+  const gramsPerLiter = normalizedFuelType.includes("DIESEL")
+    ? 2640
+    : normalizedFuelType.includes("PETROL")
+      ? 2392
+      : null;
+
+  if (!gramsPerLiter) {
+    return null;
+  }
+
+  const lPer100km = (co2 * 100) / gramsPerLiter;
+  if (!Number.isFinite(lPer100km) || lPer100km <= 0) {
+    return null;
+  }
+
+  return {
+    lPer100km: round(lPer100km, 1),
+    mpgUk: round(282.481 / lPer100km, 1),
+  };
+}
+
+async function lookupDvlaVehicle(registrationNumber: string) {
+  if (!dvlaApiKey) {
+    throw new Error("Vehicle lookup is not configured on the server.");
+  }
+
+  const normalizedRegistration = normalizeRegistration(registrationNumber);
+  if (!normalizedRegistration) {
+    return jsonResponse({ error: "Registration number is required." }, 400);
+  }
+
+  const response = await fetch(
+    "https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": dvlaApiKey,
+      },
+      body: JSON.stringify({ registrationNumber: normalizedRegistration }),
+    }
+  );
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail =
+      typeof data?.errors?.[0]?.detail === "string"
+        ? data.errors[0].detail
+        : typeof data?.error === "string"
+          ? data.error
+          : "The DVLA lookup failed.";
+    return jsonResponse({ error: detail }, response.status);
+  }
+
+  const estimatedConsumption = estimateConsumptionFromCo2(
+    String(data.fuelType ?? ""),
+    data.co2Emissions
+  );
+
+  return jsonResponse({
+    vehicle: {
+      registrationNumber: normalizeRegistration(String(data.registrationNumber ?? normalizedRegistration)),
+      make: String(data.make ?? ""),
+      fuelType: String(data.fuelType ?? ""),
+      yearOfManufacture: Number.isFinite(Number(data.yearOfManufacture))
+        ? Number(data.yearOfManufacture)
+        : null,
+      monthOfFirstRegistration: String(data.monthOfFirstRegistration ?? ""),
+      engineCapacity: Number.isFinite(Number(data.engineCapacity))
+        ? Number(data.engineCapacity)
+        : null,
+      co2Emissions: Number.isFinite(Number(data.co2Emissions))
+        ? Number(data.co2Emissions)
+        : null,
+      estimatedConsumption,
+      lookupSource: estimatedConsumption ? "dvla-co2-estimate" : "dvla-details-only",
+    },
+  });
 }
 
 function shapeProfile(row: Record<string, unknown>, includeKey = false) {
@@ -61,6 +158,20 @@ async function loadProfile(profileId: string) {
   return data;
 }
 
+async function loadProfileByNickname(nickname: string) {
+  const { data, error } = await supabase
+    .from("road_ledger_profiles")
+    .select("*")
+    .eq("nickname_normalized", normalizeNickname(nickname))
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -81,21 +192,15 @@ Deno.serve(async (req) => {
       }
 
       const nicknameNormalized = normalizeNickname(nickname);
-      const { data: existing, error: existingError } = await supabase
-        .from("road_ledger_profiles")
-        .select("*")
-        .eq("nickname_normalized", nicknameNormalized)
-        .maybeSingle();
-
-      if (existingError) {
-        throw existingError;
-      }
+      const existing = await loadProfileByNickname(nickname);
 
       if (existing) {
-        return jsonResponse(
-          { error: "That nickname is already taken on another browser." },
-          409
-        );
+        await supabase
+          .from("road_ledger_profiles")
+          .update({ last_seen_at: new Date().toISOString() })
+          .eq("id", existing.id);
+
+        return jsonResponse({ profile: shapeProfile(existing, true) });
       }
 
       const profileKey = crypto.randomUUID();
@@ -176,6 +281,11 @@ Deno.serve(async (req) => {
       }
 
       return jsonResponse({ profile: shapeProfile(data) });
+    }
+
+    if (action === "lookupVehicle") {
+      const registrationNumber = String(body.registrationNumber ?? "");
+      return await lookupDvlaVehicle(registrationNumber);
     }
 
     return jsonResponse({ error: "Unknown action." }, 400);

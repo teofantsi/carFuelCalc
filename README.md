@@ -7,6 +7,7 @@ Road Ledger is a Fuelio-style tracking app designed for GitHub Pages. The fronte
 - Create a nickname-based profile and keep the linked profile on the current browser
 - Save vehicles, fuel-ups, trip logs, settings, and chart data to Supabase
 - Track fuel costs, price per litre, full-tank efficiency, trip distance, and extra trip costs
+- Look up UK vehicles by registration via DVLA and estimate petrol or diesel consumption from DVLA CO2 data
 - View richer charts for efficiency, fuel prices, monthly spend, and trip distance
 - Capture weather snapshots from Open-Meteo for fuel and trip entries
 - Export or import local backups if you want a manual copy
@@ -31,3 +32,5 @@ This repository includes [.github/workflows/deploy-pages.yml](/Users/teotsisme/D
 - The nickname flow is lightweight, not full user authentication.
 - The app keeps the linked profile ID and profile key in the browser so returning users on the same browser keep their data.
 - The deployed frontend calls the `road-ledger-api` Supabase Edge Function to load and save profile data.
+- The DVLA lookup requires a `DVLA_VES_API_KEY` secret in the Supabase Edge Function environment.
+- The automatic consumption figure is an estimate derived from DVLA CO2 data for petrol and diesel vehicles, not an official VCA model-level consumption record.
