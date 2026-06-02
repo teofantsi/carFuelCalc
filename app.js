@@ -1140,6 +1140,10 @@ function buildReports(fillUps, trips) {
   const weatherImpact = summarizeWeatherImpact(fillUps);
   const vehicleComparison = summarizeVehicleComparison(fillUps, trips);
   const forecast = projectNextMonthSpend(fillUps, trips);
+  const mileageLogged = calculateLoggedMileage(
+    fillUps,
+    totals.distanceUnit === "mixed" ? "km" : totals.distanceUnit
+  );
   const longestTripDistance = maxOf(
     trips.map((trip) =>
       normalizeTripDistance(
@@ -1196,6 +1200,7 @@ function buildReports(fillUps, trips) {
       badge: trips.length ? `${trips.length} trips tracked` : "",
       metrics: [
         { label: "All distance", value: formatDistance(totals.tripDistance, totals.distanceUnit) },
+        { label: "Mileage logged", value: formatDistance(mileageLogged, totals.distanceUnit) },
         { label: "This year", value: formatDistance(currentYearDistance, totals.distanceUnit) },
         { label: "Avg per trip", value: formatDistance(totals.averageTripDistance, totals.distanceUnit) },
         { label: "Avg per month", value: formatDistance(monthlyDistanceAverage, totals.distanceUnit) },
@@ -3277,6 +3282,44 @@ function buildYearlySpendSeries(fillUps, trips, ownershipCosts = []) {
   return [...bucket.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([year, totals]) => ({ year, ...totals }));
+}
+
+function calculateLoggedMileage(fillUps, targetUnit = "km") {
+  const byVehicle = new Map();
+
+  for (const entry of fillUps) {
+    if (!Number.isFinite(entry.odometer)) {
+      continue;
+    }
+    const entries = byVehicle.get(entry.vehicleId) || [];
+    entries.push(entry);
+    byVehicle.set(entry.vehicleId, entries);
+  }
+
+  let total = 0;
+  for (const [vehicleId, entries] of byVehicle.entries()) {
+    if (entries.length < 2) {
+      continue;
+    }
+    const sorted = [...entries].sort(
+      (a, b) => a.date.localeCompare(b.date) || a.odometer - b.odometer
+    );
+    const first = sorted[0].odometer;
+    const last = sorted.at(-1).odometer;
+    const distance = last - first;
+    if (distance <= 0) {
+      continue;
+    }
+    const sourceUnit = getVehicleById(vehicleId)?.distanceUnit || "km";
+    total +=
+      sourceUnit === targetUnit
+        ? distance
+        : sourceUnit === "mi"
+          ? distance * 1.60934
+          : distance / 1.60934;
+  }
+
+  return total;
 }
 
 function makeYearBucket() {
