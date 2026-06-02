@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Road Ledger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="hero">
+        <p class="eyebrow">GitHub Pages + Supabase Fuel Tracker</p>
+        <h1>Road Ledger</h1>
+        <p class="hero-copy">
+          Track vehicles, fuel-ups, trips, spend, efficiency, and weather in a
+          single hosted dashboard with lightweight nickname-based profiles.
+        </p>
+
+        <div class="hero-panels">
+          <section class="glass-card">
+            <div class="section-heading compact">
+              <div>
+                <p class="panel-label">Profile</p>
+                <strong id="profileTitle">Create your garage</strong>
+              </div>
+              <span id="syncBadge" class="status-badge muted">Not connected</span>
+            </div>
+
+            <form id="profileForm" class="stack-form">
+              <label>
+                Nickname
+                <input
+                  id="profileNickname"
+                  name="nickname"
+                  required
+                  maxlength="32"
+                  placeholder="teo-runs"
+                />
+              </label>
+              <button type="submit" class="primary-button">Connect profile</button>
+            </form>
+
+            <div id="profileMeta" class="profile-meta"></div>
+
+            <div class="action-row">
+              <button id="syncNowBtn" class="ghost-button" type="button">Sync now</button>
+              <button id="switchProfileBtn" class="ghost-button" type="button">Switch profile</button>
+            </div>
+          </section>
+
+          <section class="glass-card">
+            <p class="panel-label">Current conditions</p>
+            <div id="weatherSummary" class="weather-summary">
+              <strong>Weather not loaded</strong>
+              <span>Add a home city in settings to enable forecast snapshots.</span>
+            </div>
+          </section>
+
+          <section class="glass-card">
+            <p class="panel-label">Quick actions</p>
+            <div class="action-list">
+              <button id="seedDemoBtn" class="ghost-button" type="button">Load demo data</button>
+              <button id="exportBtn" class="ghost-button" type="button">Export backup</button>
+              <label class="ghost-button file-button">
+                Import backup
+                <input id="importInput" type="file" accept="application/json" />
+              </label>
+            </div>
+          </section>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="stats-grid" id="statsGrid"></section>
+
+        <section class="layout-grid">
+          <article class="card wide">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Dashboard</p>
+                <h2>Fuel and travel trends</h2>
+              </div>
+              <select id="vehicleFilter" aria-label="Filter by vehicle"></select>
+            </div>
+
+            <div class="chart-grid" id="chartGrid"></div>
+            <div id="insightList" class="insight-list"></div>
+          </article>
+
+          <article class="card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Vehicles</p>
+                <h2>Add a car</h2>
+              </div>
+            </div>
+            <form id="vehicleForm" class="stack-form">
+              <label>
+                Vehicle name
+                <input name="name" required placeholder="2018 Ford Fiesta" />
+              </label>
+              <label>
+                Fuel type
+                <select name="fuelType" required>
+                  <option value="Petrol">Petrol</option>
+                  <option value="Diesel">Diesel</option>
+                  <option value="Hybrid">Hybrid</option>
+                  <option value="Electric">Electric</option>
+                </select>
+              </label>
+              <label>
+                Tank size (L)
+                <input name="tankSize" type="number" min="0" step="0.1" placeholder="42" />
+              </label>
+              <label>
+                Odometer unit
+                <select name="distanceUnit" required>
+                  <option value="km">Kilometres</option>
+                  <option value="mi">Miles</option>
+                </select>
+              </label>
+              <button type="submit" class="primary-button">Save vehicle</button>
+            </form>
+            <div id="vehicleList" class="list"></div>
+          </article>
+
+          <article class="card wide">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Fuel Log</p>
+                <h2>Add a fill-up</h2>
+              </div>
+            </div>
+            <form id="fillUpForm" class="form-grid">
+              <label>
+                Vehicle
+                <select name="vehicleId" required></select>
+              </label>
+              <label>
+                Date
+                <input name="date" type="date" required />
+              </label>
+              <label>
+                Odometer
+                <input name="odometer" type="number" min="0" step="0.1" required />
+              </label>
+              <label>
+                Volume (L)
+                <input name="liters" type="number" min="0" step="0.01" required />
+              </label>
+              <label>
+                Total cost
+                <input name="totalCost" type="number" min="0" step="0.01" required />
+              </label>
+              <label>
+                Price per litre
+                <input name="pricePerLiter" type="number" min="0" step="0.001" />
+              </label>
+              <label>
+                Fuel station
+                <input name="station" placeholder="Shell Westminster" />
+              </label>
+              <label>
+                Partial fill?
+                <select name="isPartial">
+                  <option value="false">No, full tank</option>
+                  <option value="true">Yes</option>
+                </select>
+              </label>
+              <label class="wide-field">
+                Notes
+                <textarea
+                  name="notes"
+                  rows="3"
+                  placeholder="Traffic was heavy, tyres adjusted, long motorway drive..."
+                ></textarea>
+              </label>
+              <button type="submit" class="primary-button">Save fill-up</button>
+            </form>
+          </article>
+
+          <article class="card wide">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Trip Log</p>
+                <h2>Add a trip</h2>
+              </div>
+            </div>
+            <form id="tripForm" class="form-grid">
+              <label>
+                Vehicle
+                <select name="vehicleId" required></select>
+              </label>
+              <label>
+                Date
+                <input name="date" type="date" required />
+              </label>
+              <label>
+                Start odometer
+                <input name="startOdometer" type="number" min="0" step="0.1" required />
+              </label>
+              <label>
+                End odometer
+                <input name="endOdometer" type="number" min="0" step="0.1" required />
+              </label>
+              <label>
+                Category
+                <input name="category" placeholder="Commute, holiday, errands..." />
+              </label>
+              <label>
+                Extra cost
+                <input name="totalCost" type="number" min="0" step="0.01" placeholder="0.00" />
+              </label>
+              <label>
+                Fuel used (L)
+                <input name="litersUsed" type="number" min="0" step="0.01" placeholder="Optional" />
+              </label>
+              <label>
+                Start location
+                <input name="startLocation" placeholder="Home" />
+              </label>
+              <label>
+                End location
+                <input name="endLocation" placeholder="Office" />
+              </label>
+              <label class="wide-field">
+                Notes
+                <textarea
+                  name="notes"
+                  rows="3"
+                  placeholder="Long motorway run, city traffic, school pickup..."
+                ></textarea>
+              </label>
+              <button type="submit" class="primary-button">Save trip</button>
+            </form>
+          </article>
+
+          <article class="card wide">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Fuel History</p>
+                <h2>Recent fill-ups</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Vehicle</th>
+                    <th>Distance</th>
+                    <th>Fuel</th>
+                    <th>Cost</th>
+                    <th>Efficiency</th>
+                    <th>Weather</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="fillUpTableBody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card wide">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Trip History</p>
+                <h2>Recent trips</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Vehicle</th>
+                    <th>Distance</th>
+                    <th>Category</th>
+                    <th>Cost</th>
+                    <th>Efficiency</th>
+                    <th>Weather</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="tripTableBody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Settings</p>
+                <h2>Location and preferences</h2>
+              </div>
+            </div>
+            <form id="settingsForm" class="stack-form">
+              <label>
+                Currency
+                <input name="currency" maxlength="6" placeholder="GBP" required />
+              </label>
+              <label>
+                Home city
+                <input name="homeCity" placeholder="London" />
+              </label>
+              <label>
+                Country code
+                <input name="countryCode" maxlength="2" placeholder="GB" />
+              </label>
+              <label>
+                Consumption view
+                <select name="consumptionMode">
+                  <option value="lPer100km">L/100 km</option>
+                  <option value="mpgUk">MPG (UK)</option>
+                  <option value="mpgUs">MPG (US)</option>
+                  <option value="kmPerL">km/L</option>
+                </select>
+              </label>
+              <button type="submit" class="primary-button">Save settings</button>
+            </form>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <template id="statCardTemplate">
+      <article class="stat-card">
+        <p class="stat-label"></p>
+        <strong class="stat-value"></strong>
+        <span class="stat-meta"></span>
+      </article>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
