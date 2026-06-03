@@ -313,7 +313,7 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Trip Log</p>
-                <h2>Add a trip</h2>
+                <h2>Plan or save a trip</h2>
               </div>
               <button
                 class="ghost-button dark-ghost section-toggle"
@@ -326,64 +326,171 @@
               </button>
             </div>
             <div id="tripsContent" data-fold-content="trips">
-            <form id="tripForm" class="form-grid">
-              <label>
-                Vehicle
-                <select name="vehicleId" required></select>
-              </label>
-              <label>
-                Date
-                <input name="date" type="date" required />
-              </label>
-              <label>
-                Start odometer
-                <input name="startOdometer" type="number" min="0" step="0.1" required />
-              </label>
-              <label>
-                End odometer
-                <input name="endOdometer" type="number" min="0" step="0.1" required />
-              </label>
-              <label>
-                Category
-                <input name="category" placeholder="Commute, holiday, errands..." />
-              </label>
-              <label>
-                Trip MPG (UK)
-                <input name="tripMpgUk" type="number" min="0" step="0.1" placeholder="Pulled from the car profile" />
-              </label>
-              <label>
-                Estimated fuel cost
-                <input name="totalCost" type="number" min="0" step="0.01" readonly />
-              </label>
-              <label>
-                Fuel used (L)
-                <input name="litersUsed" type="number" min="0" step="0.01" placeholder="Overrides MPG estimate if entered" />
-              </label>
-              <label>
-                Fuel price used
-                <input name="fuelPricePerLiter" type="number" min="0" step="0.001" readonly />
-              </label>
-              <div id="tripCalcStatus" class="lookup-status empty wide-field">
-                Trip fuel cost uses the previous fill-up price for this vehicle.
+              <div class="trip-workspace">
+                <section class="trip-workspace-banner">
+                  <div>
+                    <p class="panel-label">Trip workspace</p>
+                    <strong>Choose how you want to work</strong>
+                    <p class="trip-workspace-copy">
+                      Plan the route first, then move across to save the final trip entry with fuel cost.
+                    </p>
+                  </div>
+                  <div class="workspace-switcher" role="tablist" aria-label="Trip workspace views">
+                    <button
+                      class="workspace-switch is-active"
+                      type="button"
+                      data-trip-workspace-target="planner"
+                      aria-pressed="true"
+                    >
+                      Route planner
+                    </button>
+                    <button
+                      class="workspace-switch"
+                      type="button"
+                      data-trip-workspace-target="trip"
+                      aria-pressed="false"
+                    >
+                      Add a trip
+                    </button>
+                  </div>
+                </section>
+
+                <div class="trip-workspace-grid">
+                  <section id="routePlannerCard" class="workspace-card is-active" aria-label="Route planner">
+                    <div class="section-heading compact">
+                      <div>
+                        <p class="eyebrow">Route Planner</p>
+                        <h2>Plan the journey</h2>
+                      </div>
+                    </div>
+                    <form id="routePlannerForm" class="form-grid">
+                      <label>
+                        Vehicle
+                        <select name="vehicleId" required></select>
+                      </label>
+                      <label>
+                        Start location
+                        <input name="startLocation" placeholder="Home" />
+                      </label>
+                      <label>
+                        End location
+                        <input name="endLocation" placeholder="Office" />
+                      </label>
+                      <label>
+                        Waypoints
+                        <input
+                          name="routeWaypoints"
+                          placeholder="Optional stops, separated by commas"
+                        />
+                      </label>
+                      <div class="wide-field action-row">
+                        <button id="resolveRouteBtn" type="button" class="ghost-button dark-ghost">
+                          Check locations
+                        </button>
+                        <button id="planRouteBtn" type="button" class="ghost-button dark-ghost">
+                          Plan route
+                        </button>
+                      </div>
+                      <div id="routeResolutionSummary" class="lookup-status empty wide-field">
+                        We will show the resolved addresses here before route planning.
+                      </div>
+                      <div id="routePlanStatus" class="lookup-status empty wide-field">
+                        Plan a route from the saved locations to prefill trip distance.
+                      </div>
+                      <label>
+                        Planned distance
+                        <input name="plannedDistance" type="number" min="0" step="0.1" readonly />
+                      </label>
+                      <label>
+                        Planned duration
+                        <input name="plannedDuration" type="text" readonly />
+                      </label>
+                    </form>
+                  </section>
+
+                  <section id="tripEntryCard" class="workspace-card" aria-label="Trip entry">
+                    <div class="section-heading compact">
+                      <div>
+                        <p class="eyebrow">Trip Entry</p>
+                        <h2>Save the trip</h2>
+                      </div>
+                    </div>
+                    <form id="tripForm" class="form-grid">
+                      <label>
+                        Vehicle
+                        <select name="vehicleId" required></select>
+                      </label>
+                      <label>
+                        Date
+                        <input name="date" type="date" required />
+                      </label>
+                      <label>
+                        Start odometer
+                        <input
+                          name="startOdometer"
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          placeholder="Optional if you planned the route"
+                        />
+                      </label>
+                      <label>
+                        End odometer
+                        <input
+                          name="endOdometer"
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          placeholder="Optional if you planned the route"
+                        />
+                      </label>
+                      <label>
+                        Category
+                        <input name="category" placeholder="Commute, holiday, errands..." />
+                      </label>
+                      <label>
+                        Trip MPG (UK)
+                        <input name="tripMpgUk" type="number" min="0" step="0.1" placeholder="Pulled from the car profile" />
+                      </label>
+                      <label>
+                        Estimated fuel cost
+                        <input name="totalCost" type="number" min="0" step="0.01" readonly />
+                      </label>
+                      <label>
+                        Fuel used (L)
+                        <input name="litersUsed" type="number" min="0" step="0.01" placeholder="Overrides MPG estimate if entered" />
+                      </label>
+                      <label>
+                        Fuel price used
+                        <input name="fuelPricePerLiter" type="number" min="0" step="0.001" readonly />
+                      </label>
+                      <label>
+                        Planned distance
+                        <input name="plannedDistance" type="number" min="0" step="0.1" readonly />
+                      </label>
+                      <div id="tripCalcStatus" class="lookup-status empty wide-field">
+                        Trip fuel cost uses the previous fill-up price for this vehicle.
+                      </div>
+                      <label>
+                        Planned duration
+                        <input name="plannedDuration" type="text" readonly />
+                      </label>
+                      <div class="lookup-status empty wide-field">
+                        Route details come from the planner card next to this form.
+                      </div>
+                      <label class="wide-field">
+                        Notes
+                        <textarea
+                          name="notes"
+                          rows="3"
+                          placeholder="Long motorway run, city traffic, school pickup..."
+                        ></textarea>
+                      </label>
+                      <button type="submit" class="primary-button">Save trip</button>
+                    </form>
+                  </section>
+                </div>
               </div>
-              <label>
-                Start location
-                <input name="startLocation" placeholder="Home" />
-              </label>
-              <label>
-                End location
-                <input name="endLocation" placeholder="Office" />
-              </label>
-              <label class="wide-field">
-                Notes
-                <textarea
-                  name="notes"
-                  rows="3"
-                  placeholder="Long motorway run, city traffic, school pickup..."
-                ></textarea>
-              </label>
-              <button type="submit" class="primary-button">Save trip</button>
-            </form>
             </div>
           </article>
 

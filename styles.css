@@ -92,6 +92,13 @@ textarea {
   font: inherit;
 }
 
+button,
+input,
+select,
+textarea {
+  min-height: 44px;
+}
+
 .shell {
   display: grid;
   grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
@@ -384,6 +391,80 @@ textarea {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.trip-workspace,
+.trip-workspace-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.trip-workspace-banner,
+.workspace-card {
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card-strong) 82%, transparent);
+}
+
+.trip-workspace-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+}
+
+.trip-workspace-copy {
+  margin: 8px 0 0;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 540px;
+}
+
+.trip-workspace-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workspace-card {
+  padding: 18px;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease;
+}
+
+.workspace-card.is-active {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.workspace-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.workspace-switch {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 11px 16px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 150ms ease, background 150ms ease, border-color 150ms ease;
+}
+
+.workspace-switch:hover {
+  transform: translateY(-1px);
+}
+
+.workspace-switch.is-active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  border-color: transparent;
+  color: white;
+}
+
+.resolved-route-list {
+  display: grid;
+  gap: 8px;
 }
 
 .wide-field {
@@ -874,7 +955,8 @@ th {
 
 @media (max-width: 760px) {
   .shell {
-    padding: 14px;
+    gap: 16px;
+    padding: 12px;
   }
 
   .hero,
@@ -884,12 +966,39 @@ th {
     border-radius: 20px;
   }
 
+  .hero {
+    padding: 22px 18px;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.1rem, 12vw, 3rem);
+  }
+
+  .hero-copy {
+    margin: 14px 0 20px;
+  }
+
+  .content {
+    gap: 16px;
+  }
+
+  .stat-card,
+  .card {
+    padding: 18px;
+  }
+
+  .section-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .hero-topbar {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .form-grid,
+  .trip-workspace-grid,
   .chart-metrics,
   .insight-list,
   .report-grid,
@@ -897,9 +1006,28 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .trip-workspace-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .command-center,
   .command-stack {
     grid-template-columns: 1fr;
+  }
+
+  .section-actions,
+  .action-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .section-actions > *,
+  .action-row > *,
+  .action-list > *,
+  .theme-toggle,
+  .section-toggle {
+    width: 100%;
   }
 
   .command-header,
@@ -912,6 +1040,11 @@ th {
 
   .chart-switcher {
     justify-content: flex-start;
+  }
+
+  .chart-switch {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
   }
 
   .chart-surface-hero {
@@ -930,5 +1063,73 @@ th {
   .list-item-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .table-wrap {
+    overflow: visible;
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  tbody tr {
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--card-strong);
+    box-shadow: var(--shadow);
+  }
+
+  tbody tr.table-empty-row {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: minmax(88px, 108px) minmax(0, 1fr);
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  td:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .table-empty-row td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  .table-empty-row td::before {
+    content: none;
   }
 }

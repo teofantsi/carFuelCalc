@@ -47,6 +47,11 @@ const BACKUP_CSV_COLUMNS = [
   "fuelPricePerLiter",
   "startLocation",
   "endLocation",
+  "routeWaypoints",
+  "routeSource",
+  "plannedDistance",
+  "plannedDurationSeconds",
+  "routePolyline",
   "weatherLabel",
   "weatherTempC",
   "weatherWindKph",
@@ -103,7 +108,11 @@ let vehicleLookupResult = null;
 let editingVehicleId = "";
 let lastFillUpPricingField = "";
 let lastTripVehicleSelection = "";
+let tripWorkspaceFocus = "planner";
+let resolvedRouteStops = null;
 let dashboardFocus = "efficiency";
+const mobileViewport = window.matchMedia("(max-width: 760px)");
+let lastIsMobileViewport = mobileViewport.matches;
 const sectionVisibility = {
   vehicle: false,
   settings: false,
@@ -133,8 +142,15 @@ const elements = {
   fillUpForm: document.querySelector("#fillUpForm"),
   fillUpCalcStatus: document.querySelector("#fillUpCalcStatus"),
   fillUpTableBody: document.querySelector("#fillUpTableBody"),
+  routePlannerForm: document.querySelector("#routePlannerForm"),
   tripForm: document.querySelector("#tripForm"),
   tripCalcStatus: document.querySelector("#tripCalcStatus"),
+  routeResolutionSummary: document.querySelector("#routeResolutionSummary"),
+  resolveRouteBtn: document.querySelector("#resolveRouteBtn"),
+  routePlanStatus: document.querySelector("#routePlanStatus"),
+  planRouteBtn: document.querySelector("#planRouteBtn"),
+  routePlannerCard: document.querySelector("#routePlannerCard"),
+  tripEntryCard: document.querySelector("#tripEntryCard"),
   tripTableBody: document.querySelector("#tripTableBody"),
   ownershipCostForm: document.querySelector("#ownershipCostForm"),
   ownershipCostTableBody: document.querySelector("#ownershipCostTableBody"),
@@ -159,6 +175,7 @@ const elements = {
   showSettingsSectionBtn: document.querySelector("#showSettingsSectionBtn"),
   vehicleCard: document.querySelector("#vehicleCard"),
   settingsCard: document.querySelector("#settingsCard"),
+  workspaceSwitches: document.querySelectorAll("[data-trip-workspace-target]"),
 };
 
 function getFormField(form, name) {
@@ -176,6 +193,7 @@ async function init() {
   recomputeEfficiencies();
   bindEvents();
   syncFormsFromState();
+  syncResponsiveState(true);
   render();
 
   if (hasProfileSession()) {
@@ -191,6 +209,7 @@ async function init() {
 }
 
 function bindEvents() {
+  mobileViewport.addEventListener("change", handleViewportChange);
   elements.themeToggleBtn.addEventListener("click", toggleTheme);
   elements.profileForm.addEventListener("submit", handleProfileSubmit);
   elements.syncNowBtn.addEventListener("click", () => void syncRemoteState(true));
@@ -224,7 +243,15 @@ function bindEvents() {
       syncFillUpPricingFields
     );
   }
+  elements.routePlannerForm.addEventListener("submit", (event) => event.preventDefault());
   elements.tripForm.addEventListener("submit", (event) => void handleTripSubmit(event));
+  elements.resolveRouteBtn.addEventListener("click", () => void handleResolveRoute());
+  elements.planRouteBtn.addEventListener("click", () => void handlePlanRoute());
+  for (const button of elements.workspaceSwitches) {
+    button.addEventListener("click", () =>
+      setTripWorkspaceFocus(button.dataset.tripWorkspaceTarget)
+    );
+  }
   elements.ownershipCostForm.addEventListener("submit", (event) =>
     void handleOwnershipCostSubmit(event)
   );
@@ -233,6 +260,7 @@ function bindEvents() {
     "date",
     "startOdometer",
     "endOdometer",
+    "plannedDistance",
     "tripMpgUk",
     "litersUsed",
   ]) {
@@ -245,6 +273,26 @@ function bindEvents() {
       syncTripFormDerivedFields
     );
   }
+  for (const fieldName of ["startLocation", "endLocation", "routeWaypoints"]) {
+    getFormField(elements.routePlannerForm, fieldName).addEventListener("input", () => {
+      resetPlannedRouteFields();
+      syncTripFormDerivedFields();
+    });
+    getFormField(elements.routePlannerForm, fieldName).addEventListener("change", () => {
+      resetPlannedRouteFields();
+      syncTripFormDerivedFields();
+    });
+  }
+  getFormField(elements.routePlannerForm, "vehicleId").addEventListener("change", () => {
+    syncTripVehicleFromPlanner();
+    resetPlannedRouteFields();
+    syncTripFormDerivedFields();
+  });
+  getFormField(elements.tripForm, "vehicleId").addEventListener("change", () => {
+    syncPlannerVehicleFromTrip();
+    resetPlannedRouteFields();
+    syncTripFormDerivedFields();
+  });
   elements.settingsForm.addEventListener("submit", handleSettingsSubmit);
   elements.vehicleFilter.addEventListener("change", render);
   elements.exportBtn.addEventListener("click", exportBackup);
@@ -252,6 +300,11 @@ function bindEvents() {
   elements.seedDemoBtn.addEventListener("click", () => void seedDemoData());
   elements.backfillWeatherBtn.addEventListener("click", () => void backfillFillUpWeather());
   elements.chartGrid.addEventListener("click", handleDashboardFocusClick);
+}
+
+function handleViewportChange(event) {
+  syncResponsiveState(false, event.matches);
+  render();
 }
 
 function loadState() {
@@ -312,6 +365,7 @@ function syncFormsFromState() {
 
 function render() {
   renderVehicleOptions();
+  renderTripWorkspace();
   renderProfile();
   renderSectionVisibility();
   renderFoldableSections();
@@ -327,6 +381,22 @@ function render() {
   updateFormAvailability();
   syncFillUpPricingFields();
   syncTripFormDerivedFields();
+}
+
+function renderTripWorkspace() {
+  for (const button of elements.workspaceSwitches) {
+    const isActive = button.dataset.tripWorkspaceTarget === tripWorkspaceFocus;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  }
+
+  elements.routePlannerCard?.classList.toggle("is-active", tripWorkspaceFocus === "planner");
+  elements.tripEntryCard?.classList.toggle("is-active", tripWorkspaceFocus === "trip");
+  elements.planRouteBtn.disabled =
+    !hasProfileSession() ||
+    !state.vehicles.length ||
+    !Array.isArray(resolvedRouteStops) ||
+    resolvedRouteStops.length < 2;
 }
 
 function renderProfile() {
@@ -365,6 +435,8 @@ function renderProfile() {
 function renderVehicleOptions() {
   const selectedFilter = elements.vehicleFilter.value || "all";
   const selectedFuelVehicle = getFormField(elements.fillUpForm, "vehicleId")?.value || "";
+  const selectedPlannerVehicle =
+    getFormField(elements.routePlannerForm, "vehicleId")?.value || "";
   const selectedTripVehicle = getFormField(elements.tripForm, "vehicleId")?.value || "";
   const selectedOwnershipVehicle =
     getFormField(elements.ownershipCostForm, "vehicleId")?.value || "";
@@ -392,6 +464,8 @@ function renderVehicleOptions() {
 
   getFormField(elements.fillUpForm, "vehicleId").innerHTML =
     vehicleOptions || '<option value="">Add a vehicle first</option>';
+  getFormField(elements.routePlannerForm, "vehicleId").innerHTML =
+    vehicleOptions || '<option value="">Add a vehicle first</option>';
   getFormField(elements.tripForm, "vehicleId").innerHTML =
     vehicleOptions || '<option value="">Add a vehicle first</option>';
   getFormField(elements.ownershipCostForm, "vehicleId").innerHTML =
@@ -399,6 +473,9 @@ function renderVehicleOptions() {
 
   if (state.vehicles.some((vehicle) => vehicle.id === selectedFuelVehicle)) {
     getFormField(elements.fillUpForm, "vehicleId").value = selectedFuelVehicle;
+  }
+  if (state.vehicles.some((vehicle) => vehicle.id === selectedPlannerVehicle)) {
+    getFormField(elements.routePlannerForm, "vehicleId").value = selectedPlannerVehicle;
   }
   if (state.vehicles.some((vehicle) => vehicle.id === selectedTripVehicle)) {
     getFormField(elements.tripForm, "vehicleId").value = selectedTripVehicle;
@@ -411,6 +488,9 @@ function renderVehicleOptions() {
   if (!getFormField(elements.fillUpForm, "vehicleId").value && state.vehicles[0]) {
     getFormField(elements.fillUpForm, "vehicleId").value = state.vehicles[0].id;
   }
+  if (!getFormField(elements.routePlannerForm, "vehicleId").value && state.vehicles[0]) {
+    getFormField(elements.routePlannerForm, "vehicleId").value = state.vehicles[0].id;
+  }
   if (!getFormField(elements.tripForm, "vehicleId").value && state.vehicles[0]) {
     getFormField(elements.tripForm, "vehicleId").value = state.vehicles[0].id;
   }
@@ -420,6 +500,8 @@ function renderVehicleOptions() {
   ) {
     getFormField(elements.ownershipCostForm, "vehicleId").value = state.vehicles[0].id;
   }
+
+  syncTripVehicleFromPlanner();
 }
 
 function renderVehicleList() {
@@ -1300,6 +1382,38 @@ function renderFoldableSections() {
   }
 }
 
+function syncResponsiveState(forceApply = false, isMobile = mobileViewport.matches) {
+  if (!forceApply && isMobile === lastIsMobileViewport) {
+    return;
+  }
+
+  if (isMobile) {
+    Object.assign(foldableSectionState, {
+      dashboard: true,
+      reports: false,
+      fillUps: true,
+      trips: false,
+      ownership: false,
+      fuelHistory: true,
+      tripHistory: false,
+      ownershipHistory: false,
+    });
+  } else {
+    Object.assign(foldableSectionState, {
+      dashboard: true,
+      reports: true,
+      fillUps: true,
+      trips: true,
+      ownership: true,
+      fuelHistory: true,
+      tripHistory: true,
+      ownershipHistory: true,
+    });
+  }
+
+  lastIsMobileViewport = isMobile;
+}
+
 function toggleFoldableSection(sectionKey) {
   if (!(sectionKey in foldableSectionState)) {
     return;
@@ -1332,6 +1446,19 @@ function toggleSection(sectionKey) {
     return;
   }
   revealSection(sectionKey);
+}
+
+function setTripWorkspaceFocus(target) {
+  if (target !== "planner" && target !== "trip") {
+    return;
+  }
+
+  tripWorkspaceFocus = target;
+  renderTripWorkspace();
+
+  const card =
+    target === "planner" ? elements.routePlannerCard : elements.tripEntryCard;
+  card?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function summarizeTripCategories(trips) {
@@ -1536,7 +1663,7 @@ function renderFuelTable() {
   const entries = [...getFilteredFillUps()].sort((a, b) => b.date.localeCompare(a.date));
   if (!entries.length) {
     elements.fillUpTableBody.innerHTML =
-      '<tr><td colspan="8" class="empty">No fill-ups yet. Add your first stop above.</td></tr>';
+      '<tr class="table-empty-row"><td colspan="8" class="empty">No fill-ups yet. Add your first stop above.</td></tr>';
     return;
   }
 
@@ -1546,14 +1673,14 @@ function renderFuelTable() {
       const metrics = computeEntryMetrics(entry, vehicle);
       return `
         <tr>
-          <td>${entry.date}</td>
-          <td><strong>${escapeHtml(vehicle?.name || "Unknown vehicle")}</strong><span class="meta">${escapeHtml(entry.station || "No station")}</span></td>
-          <td>${metrics.distanceLabel}</td>
-          <td>${formatNumber(entry.liters, 2)} L</td>
-          <td>${formatCurrency(entry.totalCost)}</td>
-          <td>${metrics.efficiencyLabel}</td>
-          <td>${formatWeather(entry.weather)}</td>
-          <td><button class="danger-link" data-delete-fillup="${entry.id}" type="button">Delete</button></td>
+          <td data-label="Date">${entry.date}</td>
+          <td data-label="Vehicle"><strong>${escapeHtml(vehicle?.name || "Unknown vehicle")}</strong><span class="meta">${escapeHtml(entry.station || "No station")}</span></td>
+          <td data-label="Distance">${metrics.distanceLabel}</td>
+          <td data-label="Fuel">${formatNumber(entry.liters, 2)} L</td>
+          <td data-label="Cost">${formatCurrency(entry.totalCost)}</td>
+          <td data-label="Efficiency">${metrics.efficiencyLabel}</td>
+          <td data-label="Weather">${formatWeather(entry.weather)}</td>
+          <td data-label="Actions"><button class="danger-link" data-delete-fillup="${entry.id}" type="button">Delete</button></td>
         </tr>
       `;
     })
@@ -1568,7 +1695,7 @@ function renderTripTable() {
   const trips = [...getFilteredTrips()].sort((a, b) => b.date.localeCompare(a.date));
   if (!trips.length) {
     elements.tripTableBody.innerHTML =
-      '<tr><td colspan="8" class="empty">No trips yet. Add your first trip above.</td></tr>';
+      '<tr class="table-empty-row"><td colspan="8" class="empty">No trips yet. Add your first trip above.</td></tr>';
     return;
   }
 
@@ -1577,14 +1704,14 @@ function renderTripTable() {
       const vehicle = getVehicleById(trip.vehicleId);
       return `
         <tr>
-          <td>${trip.date}</td>
-          <td><strong>${escapeHtml(vehicle?.name || "Unknown vehicle")}</strong><span class="meta">${escapeHtml(trip.startLocation || "Unknown start")} → ${escapeHtml(trip.endLocation || "Unknown end")}</span></td>
-          <td>${formatDistance(trip.distance, vehicle?.distanceUnit || "km")}</td>
-          <td>${escapeHtml(trip.category || "Uncategorised")}</td>
-          <td>${formatCurrency(trip.totalCost || 0)}<span class="meta">${escapeHtml(buildTripCostMeta(trip))}</span></td>
-          <td>${formatTripEfficiency(trip, vehicle?.distanceUnit || "km")}<span class="meta">${escapeHtml(buildTripConsumptionMeta(trip))}</span></td>
-          <td>${formatWeather(trip.weather)}</td>
-          <td><button class="danger-link" data-delete-trip="${trip.id}" type="button">Delete</button></td>
+          <td data-label="Date">${trip.date}</td>
+          <td data-label="Vehicle"><strong>${escapeHtml(vehicle?.name || "Unknown vehicle")}</strong><span class="meta">${escapeHtml(trip.startLocation || "Unknown start")} → ${escapeHtml(trip.endLocation || "Unknown end")}</span></td>
+          <td data-label="Distance">${formatDistance(trip.distance, vehicle?.distanceUnit || "km")}</td>
+          <td data-label="Category">${escapeHtml(trip.category || "Uncategorised")}</td>
+          <td data-label="Cost">${formatCurrency(trip.totalCost || 0)}<span class="meta">${escapeHtml(buildTripCostMeta(trip))}</span></td>
+          <td data-label="Efficiency">${formatTripEfficiency(trip, vehicle?.distanceUnit || "km")}<span class="meta">${escapeHtml(buildTripConsumptionMeta(trip))}</span></td>
+          <td data-label="Weather">${formatWeather(trip.weather)}</td>
+          <td data-label="Actions"><button class="danger-link" data-delete-trip="${trip.id}" type="button">Delete</button></td>
         </tr>
       `;
     })
@@ -1599,7 +1726,7 @@ function renderOwnershipCostTable() {
   const costs = [...getFilteredOwnershipCosts()].sort((a, b) => b.date.localeCompare(a.date));
   if (!costs.length) {
     elements.ownershipCostTableBody.innerHTML =
-      '<tr><td colspan="6" class="empty">No ownership costs yet. Add service, tax, car payments, or insurance above.</td></tr>';
+      '<tr class="table-empty-row"><td colspan="6" class="empty">No ownership costs yet. Add service, tax, car payments, or insurance above.</td></tr>';
     return;
   }
 
@@ -1608,12 +1735,12 @@ function renderOwnershipCostTable() {
       const vehicle = getVehicleById(cost.vehicleId);
       return `
         <tr>
-          <td>${cost.date}</td>
-          <td>${escapeHtml(vehicle?.name || "Unknown vehicle")}</td>
-          <td>${escapeHtml(formatOwnershipCategory(cost.category))}</td>
-          <td>${formatCurrency(cost.totalCost || 0)}</td>
-          <td>${escapeHtml(cost.notes || "No notes")}</td>
-          <td><button class="danger-link" data-delete-ownership-cost="${cost.id}" type="button">Delete</button></td>
+          <td data-label="Date">${cost.date}</td>
+          <td data-label="Vehicle">${escapeHtml(vehicle?.name || "Unknown vehicle")}</td>
+          <td data-label="Type">${escapeHtml(formatOwnershipCategory(cost.category))}</td>
+          <td data-label="Cost">${formatCurrency(cost.totalCost || 0)}</td>
+          <td data-label="Notes">${escapeHtml(cost.notes || "No notes")}</td>
+          <td data-label="Actions"><button class="danger-link" data-delete-ownership-cost="${cost.id}" type="button">Delete</button></td>
         </tr>
       `;
     })
@@ -1628,7 +1755,7 @@ function renderOwnershipBreakdown() {
   const breakdown = buildOwnershipYearBreakdown(getFilteredOwnershipCosts());
   if (!breakdown.length) {
     elements.ownershipBreakdownBody.innerHTML =
-      '<tr><td colspan="6" class="empty">Yearly totals appear after you log ownership costs.</td></tr>';
+      '<tr class="table-empty-row"><td colspan="6" class="empty">Yearly totals appear after you log ownership costs.</td></tr>';
     return;
   }
 
@@ -1636,12 +1763,12 @@ function renderOwnershipBreakdown() {
     .map(
       (year) => `
         <tr>
-          <td>${year.year}</td>
-          <td>${formatCurrency(year.service)}</td>
-          <td>${formatCurrency(year.tax)}</td>
-          <td>${formatCurrency(year.carPayment)}</td>
-          <td>${formatCurrency(year.insurance)}</td>
-          <td><strong>${formatCurrency(year.total)}</strong></td>
+          <td data-label="Year">${year.year}</td>
+          <td data-label="Service">${formatCurrency(year.service)}</td>
+          <td data-label="Tax">${formatCurrency(year.tax)}</td>
+          <td data-label="Car payments">${formatCurrency(year.carPayment)}</td>
+          <td data-label="Insurance">${formatCurrency(year.insurance)}</td>
+          <td data-label="Total"><strong>${formatCurrency(year.total)}</strong></td>
         </tr>
       `
     )
@@ -1652,6 +1779,7 @@ function updateFormAvailability() {
   const enabled = hasProfileSession();
   setFormInteractive(elements.vehicleForm, enabled);
   setFormInteractive(elements.fillUpForm, enabled && state.vehicles.length > 0);
+  setFormInteractive(elements.routePlannerForm, enabled && state.vehicles.length > 0);
   setFormInteractive(elements.tripForm, enabled && state.vehicles.length > 0);
   setFormInteractive(elements.ownershipCostForm, enabled && state.vehicles.length > 0);
   setFormInteractive(elements.settingsForm, enabled);
@@ -2005,17 +2133,27 @@ async function handleTripSubmit(event) {
   const formData = new FormData(event.currentTarget);
   const vehicleId = formData.get("vehicleId").toString();
   const vehicle = getVehicleById(vehicleId);
-  const startOdometer = Number(formData.get("startOdometer"));
-  const endOdometer = Number(formData.get("endOdometer"));
-  const distance = endOdometer - startOdometer;
-  if (distance <= 0) {
-    alert("Trip end odometer must be greater than the start odometer.");
+  const routeFields = getRoutePlannerFields();
+  const startOdometer = numberOrNull(formData.get("startOdometer"));
+  const endOdometer = numberOrNull(formData.get("endOdometer"));
+  const odometerDistance =
+    Number.isFinite(startOdometer) && Number.isFinite(endOdometer)
+      ? endOdometer - startOdometer
+      : null;
+  const plannedDistance = numberOrNull(formData.get("plannedDistance"));
+  const distance =
+    Number.isFinite(odometerDistance) && odometerDistance > 0
+      ? odometerDistance
+      : plannedDistance;
+  if (!Number.isFinite(distance) || distance <= 0) {
+    alert("Add odometer values or plan a valid route first.");
     return;
   }
 
   const tripMpgUk = numberOrNull(formData.get("tripMpgUk"));
   const litersUsed = numberOrNull(formData.get("litersUsed"));
   const pricePerLiter = numberOrNull(formData.get("fuelPricePerLiter"));
+  const routeWaypoints = routeFields.routeWaypoints;
   const estimatedFuel = estimateTripFuel({
     vehicle,
     date: formData.get("date").toString(),
@@ -2037,18 +2175,22 @@ async function handleTripSubmit(event) {
     startOdometer,
     endOdometer,
     distance,
+    plannedDistance,
+    plannedDurationSeconds: parseDurationInputToSeconds(formData.get("plannedDuration")),
+    routeSource: Number.isFinite(plannedDistance) ? "osrm" : null,
+    routePolyline: getFormField(event.currentTarget, "plannedDistance").dataset.routePolyline || "",
+    routeWaypoints,
     category: formData.get("category").toString().trim(),
     totalCost,
     tripMpgUk,
     litersUsed,
     fuelPricePerLiter: pricePerLiter,
-    startLocation: formData.get("startLocation").toString().trim(),
-    endLocation: formData.get("endLocation").toString().trim(),
+    startLocation: routeFields.startLocation,
+    endLocation: routeFields.endLocation,
     notes: formData.get("notes").toString().trim(),
     weather: await fetchWeatherForDate(
       formData.get("date").toString(),
-      formData.get("startLocation").toString().trim() ||
-        formData.get("endLocation").toString().trim(),
+      routeFields.startLocation || routeFields.endLocation,
       { fallbackToHomeCity: true }
     ),
   });
@@ -2062,6 +2204,111 @@ async function handleTripSubmit(event) {
   syncTripFormDerivedFields();
   persistAndRender();
   await syncRemoteState();
+}
+
+async function handleResolveRoute() {
+  const vehicle = getVehicleById(getFormField(elements.routePlannerForm, "vehicleId").value);
+  if (!vehicle) {
+    setRouteResolutionStatus("warn", "Pick a vehicle before checking the route.");
+    return;
+  }
+
+  const routeFields = getRoutePlannerFields();
+  if (!routeFields.startLocation || !routeFields.endLocation) {
+    setRouteResolutionStatus("warn", "Enter a start and end location first.");
+    return;
+  }
+
+  elements.resolveRouteBtn.disabled = true;
+  resetPlannedRouteFields({ keepResolutionSummary: false });
+  setRouteResolutionStatus("empty", "Checking the entered locations...");
+
+  try {
+    const response = await callApi("resolveRouteLocations", {
+      origin: routeFields.startLocation,
+      destination: routeFields.endLocation,
+      waypoints: routeFields.routeWaypoints,
+      countryCode: state.settings.countryCode || "",
+    });
+
+    resolvedRouteStops = Array.isArray(response.stops) ? response.stops : null;
+    if (!resolvedRouteStops?.length) {
+      throw new Error("No route locations were resolved.");
+    }
+
+    renderResolvedRouteSummary(resolvedRouteStops);
+    elements.routePlanStatus.className = "lookup-status empty wide-field";
+    elements.routePlanStatus.textContent =
+      "Locations confirmed. You can plan the route now.";
+    renderTripWorkspace();
+  } catch (error) {
+    resolvedRouteStops = null;
+    renderResolvedRouteSummary(null);
+    setRouteResolutionStatus(
+      "warn",
+      error instanceof Error && error.message
+        ? error.message
+        : "We could not confidently resolve the locations."
+    );
+    renderTripWorkspace();
+  } finally {
+    elements.resolveRouteBtn.disabled = false;
+  }
+}
+
+async function handlePlanRoute() {
+  const vehicle = getVehicleById(getFormField(elements.routePlannerForm, "vehicleId").value);
+  if (!vehicle) {
+    elements.routePlanStatus.className = "lookup-status warn wide-field";
+    elements.routePlanStatus.textContent = "Pick a vehicle before planning a route.";
+    return;
+  }
+
+  if (!Array.isArray(resolvedRouteStops) || resolvedRouteStops.length < 2) {
+    elements.routePlanStatus.className = "lookup-status warn wide-field";
+    elements.routePlanStatus.textContent =
+      "Check and confirm the locations before planning the route.";
+    return;
+  }
+
+  elements.planRouteBtn.disabled = true;
+  elements.routePlanStatus.className = "lookup-status empty wide-field";
+  elements.routePlanStatus.textContent = "Planning route...";
+
+  try {
+    const response = await callApi("planRoute", {
+      resolvedStops: resolvedRouteStops,
+    });
+    const route = response.route || {};
+    const plannedDistance = convertMetersToUnit(route.distanceMeters, vehicle.distanceUnit);
+    const plannedDuration = formatDuration(route.durationSeconds);
+
+    getFormField(elements.routePlannerForm, "plannedDistance").value = Number.isFinite(plannedDistance)
+      ? formatFixedInput(plannedDistance, 1)
+      : "";
+    getFormField(elements.routePlannerForm, "plannedDuration").value = plannedDuration;
+    getFormField(elements.routePlannerForm, "plannedDistance").dataset.routePolyline =
+      route.polyline || "";
+    getFormField(elements.tripForm, "plannedDistance").value = Number.isFinite(plannedDistance)
+      ? formatFixedInput(plannedDistance, 1)
+      : "";
+    getFormField(elements.tripForm, "plannedDistance").dataset.routePolyline =
+      route.polyline || "";
+    getFormField(elements.tripForm, "plannedDuration").value = plannedDuration;
+    elements.routePlanStatus.className = "lookup-status good wide-field";
+    elements.routePlanStatus.textContent =
+      `${formatDistance(plannedDistance, vehicle.distanceUnit)} planned in ${plannedDuration}.`;
+    syncTripFormDerivedFields();
+  } catch (error) {
+    resetPlannedRouteFields();
+    elements.routePlanStatus.className = "lookup-status warn wide-field";
+    elements.routePlanStatus.textContent =
+      error instanceof Error && error.message
+        ? error.message
+        : "Route planning failed.";
+  } finally {
+    elements.planRouteBtn.disabled = false;
+  }
 }
 
 async function handleOwnershipCostSubmit(event) {
@@ -2311,7 +2558,40 @@ function resetTripFormDerivedState() {
     "Trip fuel cost uses the previous fill-up price for this vehicle.";
 }
 
+function resetPlannedRouteFields(options = {}) {
+  const { keepResolutionSummary = false } = options;
+  resolvedRouteStops = null;
+  const plannerDistanceField = getFormField(elements.routePlannerForm, "plannedDistance");
+  const plannerDurationField = getFormField(elements.routePlannerForm, "plannedDuration");
+  const plannedDistanceField = getFormField(elements.tripForm, "plannedDistance");
+  const plannedDurationField = getFormField(elements.tripForm, "plannedDuration");
+  if (plannerDistanceField) {
+    plannerDistanceField.value = "";
+    delete plannerDistanceField.dataset.routePolyline;
+  }
+  if (plannerDurationField) {
+    plannerDurationField.value = "";
+  }
+  if (plannedDistanceField) {
+    plannedDistanceField.value = "";
+    delete plannedDistanceField.dataset.routePolyline;
+  }
+  if (plannedDurationField) {
+    plannedDurationField.value = "";
+  }
+  if (!keepResolutionSummary) {
+    renderResolvedRouteSummary(null);
+  }
+  if (elements.routePlanStatus) {
+    elements.routePlanStatus.className = "lookup-status empty wide-field";
+    elements.routePlanStatus.textContent =
+      "Plan a route from the saved locations to prefill trip distance.";
+  }
+  renderTripWorkspace();
+}
+
 function syncTripFormDerivedFields() {
+  syncTripPlannerOutputsFromPlanner();
   const vehicle = getVehicleById(getFormField(elements.tripForm, "vehicleId").value);
   if (!vehicle) {
     resetTripFormDerivedState();
@@ -2331,10 +2611,15 @@ function syncTripFormDerivedFields() {
 
   const startOdometer = numberOrNull(getFormField(elements.tripForm, "startOdometer").value);
   const endOdometer = numberOrNull(getFormField(elements.tripForm, "endOdometer").value);
-  const distance =
+  const odometerDistance =
     Number.isFinite(startOdometer) && Number.isFinite(endOdometer)
       ? endOdometer - startOdometer
       : null;
+  const plannedDistance = numberOrNull(getFormField(elements.tripForm, "plannedDistance").value);
+  const distance =
+    Number.isFinite(odometerDistance) && odometerDistance > 0
+      ? odometerDistance
+      : plannedDistance;
   const tripMpgUk = numberOrNull(getFormField(elements.tripForm, "tripMpgUk").value);
   const litersUsed = numberOrNull(getFormField(elements.tripForm, "litersUsed").value);
   const estimate = estimateTripFuel({
@@ -2362,6 +2647,86 @@ function syncTripFormDerivedFields() {
     elements.tripCalcStatus.className = "lookup-status empty wide-field";
     elements.tripCalcStatus.textContent =
       "Trip fuel cost uses the previous fill-up price for this vehicle.";
+  }
+}
+
+function getRoutePlannerFields() {
+  return {
+    startLocation: getFormField(elements.routePlannerForm, "startLocation").value.trim(),
+    endLocation: getFormField(elements.routePlannerForm, "endLocation").value.trim(),
+    routeWaypoints: parseTripWaypoints(
+      getFormField(elements.routePlannerForm, "routeWaypoints").value
+    ),
+  };
+}
+
+function renderResolvedRouteSummary(stops) {
+  if (!elements.routeResolutionSummary) {
+    return;
+  }
+
+  if (!Array.isArray(stops) || !stops.length) {
+    elements.routeResolutionSummary.className = "lookup-status empty wide-field";
+    elements.routeResolutionSummary.textContent =
+      "We will show the resolved addresses here before route planning.";
+    return;
+  }
+
+  const lines = stops
+    .map((stop, index) => {
+      const label = index === 0
+        ? "Start"
+        : index === stops.length - 1
+          ? "End"
+          : `Waypoint ${index}`;
+      return `<span><strong>${label}:</strong> ${escapeHtml(stop.label || stop.query || "Unknown stop")}</span>`;
+    })
+    .join("");
+
+  elements.routeResolutionSummary.className = "lookup-status good wide-field";
+  elements.routeResolutionSummary.innerHTML =
+    `<div class="resolved-route-list">${lines}</div>`;
+}
+
+function setRouteResolutionStatus(level, message) {
+  renderResolvedRouteSummary(null);
+  if (!elements.routeResolutionSummary) {
+    return;
+  }
+  elements.routeResolutionSummary.className = `lookup-status ${level} wide-field`;
+  elements.routeResolutionSummary.textContent = message;
+}
+
+function syncTripVehicleFromPlanner() {
+  const plannerVehicleId = getFormField(elements.routePlannerForm, "vehicleId").value;
+  if (plannerVehicleId && getFormField(elements.tripForm, "vehicleId").value !== plannerVehicleId) {
+    getFormField(elements.tripForm, "vehicleId").value = plannerVehicleId;
+  }
+}
+
+function syncPlannerVehicleFromTrip() {
+  const tripVehicleId = getFormField(elements.tripForm, "vehicleId").value;
+  if (
+    tripVehicleId &&
+    getFormField(elements.routePlannerForm, "vehicleId").value !== tripVehicleId
+  ) {
+    getFormField(elements.routePlannerForm, "vehicleId").value = tripVehicleId;
+  }
+}
+
+function syncTripPlannerOutputsFromPlanner() {
+  const plannerDistanceField = getFormField(elements.routePlannerForm, "plannedDistance");
+  const plannerDurationField = getFormField(elements.routePlannerForm, "plannedDuration");
+  const tripDistanceField = getFormField(elements.tripForm, "plannedDistance");
+  const tripDurationField = getFormField(elements.tripForm, "plannedDuration");
+
+  tripDistanceField.value = plannerDistanceField.value;
+  tripDurationField.value = plannerDurationField.value;
+
+  if (plannerDistanceField.dataset.routePolyline) {
+    tripDistanceField.dataset.routePolyline = plannerDistanceField.dataset.routePolyline;
+  } else {
+    delete tripDistanceField.dataset.routePolyline;
   }
 }
 
@@ -2453,6 +2818,53 @@ function estimateLitersFromMpg(distance, distanceUnit, mpgUk) {
 
   const miles = distanceUnit === "mi" ? distance : distance / 1.60934;
   return roundMaybe((miles / mpgUk) * 4.54609, 2);
+}
+
+function parseTripWaypoints(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function convertMetersToUnit(distanceMeters, distanceUnit) {
+  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) {
+    return null;
+  }
+  return roundMaybe(distanceUnit === "mi" ? distanceMeters / 1609.34 : distanceMeters / 1000, 1);
+}
+
+function formatDuration(totalSeconds) {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+    return "";
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.round((totalSeconds % 3600) / 60);
+  if (!hours) {
+    return `${minutes} min`;
+  }
+  if (!minutes) {
+    return `${hours} hr`;
+  }
+  return `${hours} hr ${minutes} min`;
+}
+
+function parseDurationInputToSeconds(value) {
+  const input = String(value || "").trim();
+  if (!input) {
+    return null;
+  }
+
+  const match = input.match(/^(?:(\d+)\s*hr)?(?:\s*(\d+)\s*min)?$/i);
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const totalSeconds = hours * 3600 + minutes * 60;
+  return totalSeconds > 0 ? totalSeconds : null;
 }
 
 function exportBackup() {
@@ -2562,6 +2974,11 @@ function buildBackupCsv() {
       fuelPricePerLiter: trip.fuelPricePerLiter,
       startLocation: trip.startLocation,
       endLocation: trip.endLocation,
+      routeWaypoints: Array.isArray(trip.routeWaypoints) ? trip.routeWaypoints.join(", ") : "",
+      routeSource: trip.routeSource,
+      plannedDistance: trip.plannedDistance,
+      plannedDurationSeconds: trip.plannedDurationSeconds,
+      routePolyline: trip.routePolyline,
       notes: trip.notes,
       weatherLabel: trip.weather?.label,
       weatherTempC: trip.weather?.tempC,
@@ -2678,6 +3095,11 @@ function importRoadLedgerRows(rows) {
             fuelPricePerLiter: parseNullableNumber(row.fuelPricePerLiter),
             startLocation: row.startLocation || "",
             endLocation: row.endLocation || "",
+            routeWaypoints: parseTripWaypoints(row.routeWaypoints || ""),
+            routeSource: row.routeSource || null,
+            plannedDistance: parseNullableNumber(row.plannedDistance),
+            plannedDurationSeconds: parseNullableNumber(row.plannedDurationSeconds),
+            routePolyline: row.routePolyline || "",
             notes: row.notes || "",
             weather: buildWeatherSnapshot(row),
           });
