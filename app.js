@@ -388,10 +388,16 @@ function renderTripWorkspace() {
     const isActive = button.dataset.tripWorkspaceTarget === tripWorkspaceFocus;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", String(isActive));
+    button.setAttribute("tabindex", isActive ? "0" : "-1");
   }
 
-  elements.routePlannerCard?.classList.toggle("is-active", tripWorkspaceFocus === "planner");
-  elements.tripEntryCard?.classList.toggle("is-active", tripWorkspaceFocus === "trip");
+  const showPlanner = tripWorkspaceFocus === "planner";
+  elements.routePlannerCard?.classList.toggle("is-active", showPlanner);
+  elements.routePlannerCard?.toggleAttribute("hidden", !showPlanner);
+  elements.routePlannerCard?.setAttribute("aria-hidden", String(!showPlanner));
+  elements.tripEntryCard?.classList.toggle("is-active", !showPlanner);
+  elements.tripEntryCard?.toggleAttribute("hidden", showPlanner);
+  elements.tripEntryCard?.setAttribute("aria-hidden", String(showPlanner));
   elements.planRouteBtn.disabled =
     !hasProfileSession() ||
     !state.vehicles.length ||

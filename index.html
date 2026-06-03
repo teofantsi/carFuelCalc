@@ -340,6 +340,7 @@
                       class="workspace-switch is-active"
                       type="button"
                       data-trip-workspace-target="planner"
+                      aria-controls="routePlannerCard"
                       aria-pressed="true"
                     >
                       Route planner
@@ -348,6 +349,7 @@
                       class="workspace-switch"
                       type="button"
                       data-trip-workspace-target="trip"
+                      aria-controls="tripEntryCard"
                       aria-pressed="false"
                     >
                       Add a trip
@@ -356,7 +358,12 @@
                 </section>
 
                 <div class="trip-workspace-grid">
-                  <section id="routePlannerCard" class="workspace-card is-active" aria-label="Route planner">
+                  <section
+                    id="routePlannerCard"
+                    class="workspace-card is-active"
+                    aria-label="Route planner"
+                    role="tabpanel"
+                  >
                     <div class="section-heading compact">
                       <div>
                         <p class="eyebrow">Route Planner</p>
@@ -408,7 +415,13 @@
                     </form>
                   </section>
 
-                  <section id="tripEntryCard" class="workspace-card" aria-label="Trip entry">
+                  <section
+                    id="tripEntryCard"
+                    class="workspace-card"
+                    aria-label="Trip entry"
+                    role="tabpanel"
+                    hidden
+                  >
                     <div class="section-heading compact">
                       <div>
                         <p class="eyebrow">Trip Entry</p>

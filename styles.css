@@ -423,7 +423,7 @@ textarea {
 
 .trip-workspace-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
@@ -435,6 +435,10 @@ textarea {
   background: var(--card-strong);
   box-shadow: var(--shadow);
   transition: box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease;
+}
+
+.workspace-card[hidden] {
+  display: none;
 }
 
 .workspace-card.is-active {
