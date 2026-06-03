@@ -99,23 +99,6 @@
           </div>
         </section>
 
-        <section class="sidebar-card utility-panel">
-          <div class="section-heading compact">
-            <div>
-              <p class="panel-label">Quick tools</p>
-              <strong>Support and data tasks</strong>
-            </div>
-          </div>
-          <div class="action-list utility-actions">
-            <button id="seedDemoBtn" class="ghost-button" type="button">Load demo data</button>
-            <button id="backfillWeatherBtn" class="ghost-button" type="button">Backfill weather</button>
-            <button id="exportBtn" class="ghost-button" type="button">Export backup</button>
-            <label class="ghost-button file-button">
-              Import backup
-              <input id="importInput" type="file" accept=".csv,text/csv" />
-            </label>
-          </div>
-        </section>
       </aside>
 
       <main class="workspace">
@@ -786,27 +769,11 @@
               </label>
               <button type="submit" class="primary-button">Save settings</button>
             </form>
-          </article>
-        </section>
-      </main>
-    </div>
-
-    <nav class="mobile-dock" aria-label="Mobile sections">
-      <a href="#dashboardSection">Dashboard</a>
-      <a href="#historySection">History</a>
-      <a href="#garageSection" data-mobile-reveal="vehicle">Garage</a>
-      <a href="#insightsSection">Insights</a>
-      <a href="#settingsSection" data-mobile-reveal="settings">Settings</a>
-    </nav>
-
-    <template id="statCardTemplate">
-      <article class="stat-card">
-        <p class="stat-label"></p>
-        <strong class="stat-value"></strong>
-        <span class="stat-meta"></span>
-      </article>
-    </template>
-
-    <script type="module" src="./app.js"></script>
-  </body>
-</html>
+            <section class="settings-tools">
+              <div class="section-heading compact">
+                <div>
+                  <p class="panel-label">Quick tools</p>
+                  <strong>Support and data tasks</strong>
+                </div>
+              </div>
+              <div class="action-list util
