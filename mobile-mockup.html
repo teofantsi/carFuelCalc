@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Road Ledger Mobile Mockup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./mobile-mockup.css" />
+  </head>
+  <body>
+    <main class="mockup-page">
+      <section class="mockup-intro">
+        <p class="eyebrow">Road Ledger</p>
+        <h1>Cleaner Mobile Flow</h1>
+        <p>
+          A static HTML/CSS exploration of a calmer mobile experience with a
+          lighter dashboard, shorter forms, clearer history, and a simpler
+          garage view.
+        </p>
+      </section>
+
+      <section class="phone-grid" aria-label="Road Ledger mobile screen flow">
+        <article class="phone">
+          <div class="phone-shell">
+            <header class="screen hero-screen">
+              <div class="status-bar">
+                <span>9:41</span>
+                <span>5G</span>
+              </div>
+              <div class="hero-top">
+                <div>
+                  <h2>Road Ledger</h2>
+                  <p>Ford Fiesta • SN15 OAA</p>
+                </div>
+                <button class="icon-button" type="button" aria-label="Settings">⚙</button>
+              </div>
+              <div class="segmented-control">
+                <button class="active" type="button">Fuel</button>
+                <button type="button">Trips</button>
+                <button type="button">Costs</button>
+              </div>
+              <p class="hero-label">This month • May 2024</p>
+              <strong class="hero-total">£236.42</strong>
+              <p class="hero-meta">£42.18 less than April</p>
+              <div class="hero-chart" aria-hidden="true">
+                <span style="height: 28%"></span>
+                <span style="height: 42%"></span>
+                <span style="height: 36%"></span>
+                <span style="height: 61%"></span>
+                <span style="height: 54%"></span>
+                <span style="height: 74%"></span>
+                <span style="height: 66%"></span>
+              </div>
+            </header>
+
+            <section class="screen body-screen">
+              <div class="section-head">
+                <h3>Quick Actions</h3>
+              </div>
+              <div class="action-grid">
+                <button class="action-card warm" type="button">
+                  <span class="action-icon">⛽</span>
+                  <span>Add Fill-up</span>
+                </button>
+                <button class="action-card sage" type="button">
+                  <span class="action-icon">⇄</span>
+                  <span>Add Trip</span>
+                </button>
+                <button class="action-card" type="button">
+                  <span class="action-icon">£</span>
+                  <span>Log Cost</span>
+                </button>
+              </div>
+
+              <div class="weather-card card">
+                <div>
+                  <p class="label">London, UK</p>
+                  <strong>16°C</strong>
+                  <p>Partly cloudy</p>
+                </div>
+                <div class="weather-meta">
+                  <span>Feels like 15°C</span>
+                  <span>↑ 18° ↓ 9°</span>
+                  <span>NW 14 mph</span>
+                </div>
+              </div>
+
+              <div class="section-head">
+                <h3 class="section-title-with-icon">
+                  <span class="section-icon" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                  Insights
+                </h3>
+                <a href="/">See all</a>
+              </div>
+              <div class="mini-cards">
+                <div class="mini-card accent-sage">
+                  <p class="label">Efficiency</p>
+                  <strong>46.2 MPG</strong>
+                  <div class="sparkline line" aria-hidden="true"></div>
+                </div>
+                <div class="mini-card">
+                  <p class="label">Spend per mile</p>
+                  <strong>10.8p</strong>
+                  <div class="sparkline bars" aria-hidden="true"></div>
+                </div>
+                <div class="mini-card accent-warm">
+                  <p class="label">Fill-ups</p>
+                  <strong>3</strong>
+                  <div class="sparkline bars tall" aria-hidden="true"></div>
+                </div>
+              </div>
+            </section>
+
+            <nav class="bottom-nav" aria-label="Primary">
+              <a class="active" href="/">Dashboard</a>
+              <a href="/">History</a>
+              <button class="nav-fab" type="button" aria-label="Add">+</button>
+              <a href="/">Garage</a>
+              <a href="/">More</a>
+            </nav>
+          </div>
+        </article>
+
+        <article class="phone">
+          <div class="phone-shell">
+            <header class="screen plain-screen">
+              <div class="header-row">
+                <button class="text-button" type="button">Back</button>
+                <h3>Add Fill-up</h3>
+                <span class="header-spacer"></span>
+              </div>
+              <p class="screen-note">Ford Fiesta • Today</p>
+            </header>
+
+            <section class="screen form-screen">
+              <div class="form-card">
+                <label>
+                  Date
+                  <input type="text" value="03 Jun 2026" />
+                </label>
+                <label>
+                  Odometer
+                  <input type="text" value="48,240 mi" />
+                </label>
+                <label>
+                  Volume
+                  <input type="text" value="31.7 L" />
+                </label>
+                <label>
+                  Total cost
+                  <input type="text" value="£47.86" />
+                </label>
+                <label>
+                  Fuel station
+                  <input type="text" value="Shell Westminster" />
+                </label>
+              </div>
+
+              <div class="summary-card card">
+                <p class="label">Calculated price</p>
+                <strong>£1.510 / L</strong>
+                <p>Based on liters and total cost. Save when the numbers look right.</p>
+              </div>
+
+              <button class="primary-cta" type="button">Save Fill-up</button>
+            </section>
+          </div>
+        </article>
+
+        <article class="phone">
+          <div class="phone-shell">
+            <header class="screen plain-screen">
+              <div class="header-row">
+                <h3>History</h3>
+                <button class="icon-button" type="button" aria-label="Filter">⌕</button>
+              </div>
+              <div class="filter-row">
+                <button class="chip active" type="button">All</button>
+                <button class="chip" type="button">Fill-ups</button>
+                <button class="chip" type="button">Trips</button>
+                <button class="chip" type="button">Costs</button>
+              </div>
+            </header>
+
+            <section class="screen list-screen">
+              <article class="feed-card">
+                <div class="feed-top">
+                  <span class="feed-kind warm">Fill-up</span>
+                  <strong>£47.86</strong>
+                </div>
+                <h4>Shell Westminster</h4>
+                <p>03 Jun 2026 • 31.7 L • 48,240 mi</p>
+              </article>
+
+              <article class="feed-card">
+                <div class="feed-top">
+                  <span class="feed-kind sage">Trip</span>
+                  <strong>£8.92</strong>
+                </div>
+                <h4>Home → Office</h4>
+                <p>02 Jun 2026 • 18.4 mi • Commute</p>
+              </article>
+
+              <article class="feed-card">
+                <div class="feed-top">
+                  <span class="feed-kind soft">Cost</span>
+                  <strong>£320.00</strong>
+                </div>
+                <h4>Insurance renewal</h4>
+                <p>01 Jun 2026 • Annual ownership cost</p>
+              </article>
+
+              <article class="feed-card">
+                <div class="feed-top">
+                  <span class="feed-kind warm">Fill-up</span>
+                  <strong>£45.02</strong>
+                </div>
+                <h4>Tesco Petrol</h4>
+                <p>28 May 2026 • 29.5 L • 47,884 mi</p>
+              </article>
+            </section>
+          </div>
+        </article>
+
+        <article class="phone">
+          <div class="phone-shell">
+            <header class="screen plain-screen">
+              <div class="header-row">
+                <h3>Garage</h3>
+                <button class="text-button" type="button">Edit</button>
+              </div>
+            </header>
+
+            <section class="screen body-screen">
+              <div class="garage-card card">
+                <div class="garage-title">
+                  <div>
+                    <h4>Ford Fiesta</h4>
+                    <p>SN15 OAA</p>
+                  </div>
+                  <span class="badge">Petrol</span>
+                </div>
+                <div class="spec-grid">
+                  <div>
+                    <span class="label">Profile MPG</span>
+                    <strong>46.2</strong>
+                  </div>
+                  <div>
+                    <span class="label">Tank size</span>
+                    <strong>42 L</strong>
+                  </div>
+                  <div>
+                    <span class="label">This year</span>
+                    <strong>£2,184</strong>
+                  </div>
+                  <div>
+                    <span class="label">Trips</span>
+                    <strong>48</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="cost-summary card">
+                <div class="section-head compact">
+                  <h3>Annual Costs</h3>
+                  <span>2026</span>
+                </div>
+                <div class="summary-row">
+                  <span>Insurance</span>
+                  <strong>£320</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Service</span>
+                  <strong>£185</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Tax</span>
+                  <strong>£190</strong>
+                </div>
+                <div class="summary-row total">
+                  <span>Total</span>
+                  <strong>£695</strong>
+                </div>
+              </div>
+
+              <button class="secondary-cta" type="button">Add or Edit Vehicle</button>
+            </section>
+          </div>
+        </article>
+
+        <article class="phone">
+          <div class="phone-shell">
+            <header class="screen plain-screen">
+              <div class="header-row">
+                <h3 class="section-title-with-icon">
+                  <span class="section-icon" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                  Insights
+                </h3>
+                <button class="text-button" type="button">Year</button>
+              </div>
+              <p class="screen-note">A lighter reporting view for mobile.</p>
+            </header>
+
+            <section class="screen insights-screen">
+              <div class="report-card">
+                <p class="label">Average efficiency</p>
+                <strong>46.2 MPG</strong>
+                <div class="report-chart wave" aria-hidden="true"></div>
+              </div>
+              <div class="report-card">
+                <p class="label">Monthly spend trend</p>
+                <strong>£236 average</strong>
+                <div class="report-chart columns" aria-hidden="true"></div>
+              </div>
+              <div class="report-card">
+                <p class="label">Cost mix</p>
+                <strong>Fuel 71%</strong>
+                <div class="report-stats">
+                  <span>Fuel £1,552</span>
+                  <span>Trips £214</span>
+                  <span>Ownership £418</span>
+                </div>
+              </div>
+              <div class="report-card emphasis">
+                <p class="label">Weather signal</p>
+                <strong>Colder days lower MPG by 8%</strong>
+                <p class="report-copy">
+                  Performance dipped on weeks under 10°C, especially on short city
+                  runs.
+                </p>
+              </div>
+            </section>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

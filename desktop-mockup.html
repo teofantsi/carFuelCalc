@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Road Ledger Desktop Mockup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./desktop-mockup.css" />
+  </head>
+  <body>
+    <main class="desktop-page">
+      <section class="page-intro">
+        <p class="eyebrow">Road Ledger</p>
+        <h1>Cleaner Desktop Direction</h1>
+        <p>
+          A desktop mockup that keeps the calmer visual system from mobile while
+          taking advantage of wider layouts, persistent navigation, and richer
+          reporting surfaces.
+        </p>
+      </section>
+
+      <section class="desktop-shell" aria-label="Road Ledger desktop mockup">
+        <aside class="sidebar">
+          <div class="brand-block">
+            <p class="eyebrow soft">Road Ledger</p>
+            <h2>Garage HQ</h2>
+            <p>One calm workspace for fuel, trips, costs, and vehicle performance.</p>
+          </div>
+
+          <nav class="sidebar-nav" aria-label="Primary">
+            <a class="nav-item active" href="/">
+              <span class="nav-icon dashboard-icon" aria-hidden="true"></span>
+              Dashboard
+            </a>
+            <a class="nav-item" href="/">
+              <span class="nav-icon history-icon" aria-hidden="true"></span>
+              History
+            </a>
+            <a class="nav-item" href="/">
+              <span class="nav-icon garage-icon" aria-hidden="true"></span>
+              Garage
+            </a>
+            <a class="nav-item" href="/">
+              <span class="nav-icon insights-icon" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+              Insights
+            </a>
+            <a class="nav-item" href="/">
+              <span class="nav-icon settings-icon" aria-hidden="true"></span>
+              Settings
+            </a>
+          </nav>
+
+          <section class="sidebar-card">
+            <p class="label">Current vehicle</p>
+            <strong>Ford Fiesta</strong>
+            <p>SN15 OAA • Petrol • 46.2 MPG (UK)</p>
+            <div class="sidebar-chip-row">
+              <span class="chip">42 L tank</span>
+              <span class="chip">London</span>
+            </div>
+          </section>
+
+          <section class="sidebar-card weather-panel">
+            <div>
+              <p class="label">Weather</p>
+              <strong>16°C</strong>
+              <p>Partly cloudy</p>
+            </div>
+            <div class="weather-panel-meta">
+              <span>Feels like 15°C</span>
+              <span>↑ 18° ↓ 9°</span>
+              <span>NW 14 mph</span>
+            </div>
+          </section>
+        </aside>
+
+        <div class="workspace">
+          <header class="topbar">
+            <div>
+              <p class="eyebrow">May 2024 Snapshot</p>
+              <h2>Fuel and travel dashboard</h2>
+            </div>
+            <div class="topbar-actions">
+              <button class="soft-button" type="button">This month</button>
+              <button class="soft-button" type="button">Ford Fiesta</button>
+              <button class="dark-button" type="button">Add entry</button>
+            </div>
+          </header>
+
+          <section class="hero-panel">
+            <div class="hero-copy">
+              <div class="segmented-control">
+                <button class="active" type="button">Fuel</button>
+                <button type="button">Trips</button>
+                <button type="button">Costs</button>
+              </div>
+              <p class="hero-label">This month</p>
+              <strong class="hero-total">£236.42</strong>
+              <p class="hero-subtitle">Total fuel spend across 3 fill-ups</p>
+              <p class="hero-delta">£42.18 less than April</p>
+            </div>
+            <div class="hero-visual">
+              <div class="hero-chart">
+                <span style="height: 36%"></span>
+                <span style="height: 48%"></span>
+                <span style="height: 42%"></span>
+                <span style="height: 62%"></span>
+                <span style="height: 71%"></span>
+                <span style="height: 64%"></span>
+                <span style="height: 80%"></span>
+                <span style="height: 73%"></span>
+              </div>
+              <div class="hero-road" aria-hidden="true"></div>
+            </div>
+          </section>
+
+          <section class="action-and-summary">
+            <article class="panel">
+              <div class="panel-head">
+                <h3>Quick Actions</h3>
+              </div>
+              <div class="action-grid">
+                <button class="action-card warm" type="button">
+                  <span class="action-icon">⛽</span>
+                  <strong>Add Fill-up</strong>
+                  <span>Fuel cost, liters, odometer</span>
+                </button>
+                <button class="action-card sage" type="button">
+                  <span class="action-icon">⇄</span>
+                  <strong>Add Trip</strong>
+                  <span>Distance, category, fuel estimate</span>
+                </button>
+                <button class="action-card" type="button">
+                  <span class="action-icon">£</span>
+                  <strong>Log Cost</strong>
+                  <span>Insurance, service, tax</span>
+                </button>
+              </div>
+            </article>
+
+            <article class="panel summary-stack">
+              <div class="stat-card">
+                <p class="label">Efficiency</p>
+                <strong>46.2 MPG</strong>
+                <span>Average this month</span>
+              </div>
+              <div class="stat-card">
+                <p class="label">Spend per mile</p>
+                <strong>10.8p</strong>
+                <span>1.6p down vs April</span>
+              </div>
+              <div class="stat-card">
+                <p class="label">Ownership costs</p>
+                <strong>£695</strong>
+                <span>Year to date</span>
+              </div>
+            </article>
+          </section>
+
+          <section class="reports-grid">
+            <article class="panel insights-panel">
+              <div class="panel-head">
+                <h3 class="title-with-icon">
+                  <span class="insights-icon large" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                  Insights
+                </h3>
+                <a href="/">See all</a>
+              </div>
+              <div class="insight-cards">
+                <div class="insight-card accent-sage">
+                  <p class="label">Efficiency trend</p>
+                  <strong>Holding steady</strong>
+                  <div class="sparkline line" aria-hidden="true"></div>
+                </div>
+                <div class="insight-card">
+                  <p class="label">Monthly spend</p>
+                  <strong>Cooling slightly</strong>
+                  <div class="sparkline bars" aria-hidden="true"></div>
+                </div>
+                <div class="insight-card accent-warm">
+                  <p class="label">Fill-up rhythm</p>
+                  <strong>Every 10 days</strong>
+                  <div class="sparkline bars tall" aria-hidden="true"></div>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel history-panel">
+              <div class="panel-head">
+                <h3>Recent Activity</h3>
+                <div class="filter-row">
+                  <button class="chip active" type="button">All</button>
+                  <button class="chip" type="button">Fuel</button>
+                  <button class="chip" type="button">Trips</button>
+                  <button class="chip" type="button">Costs</button>
+                </div>
+              </div>
+              <div class="activity-table">
+                <div class="table-row table-head">
+                  <span>Date</span>
+                  <span>Type</span>
+                  <span>Details</span>
+                  <span>Amount</span>
+                </div>
+                <div class="table-row">
+                  <span>03 Jun 2026</span>
+                  <span><em class="feed-kind warm">Fill-up</em></span>
+                  <span>Shell Westminster • 31.7 L • 48,240 mi</span>
+                  <strong>£47.86</strong>
+                </div>
+                <div class="table-row">
+                  <span>02 Jun 2026</span>
+                  <span><em class="feed-kind sage">Trip</em></span>
+                  <span>Home → Office • 18.4 mi • Commute</span>
+                  <strong>£8.92</strong>
+                </div>
+                <div class="table-row">
+                  <span>01 Jun 2026</span>
+                  <span><em class="feed-kind soft">Cost</em></span>
+                  <span>Insurance renewal • Annual ownership</span>
+                  <strong>£320.00</strong>
+                </div>
+                <div class="table-row">
+                  <span>28 May 2026</span>
+                  <span><em class="feed-kind warm">Fill-up</em></span>
+                  <span>Tesco Petrol • 29.5 L • 47,884 mi</span>
+                  <strong>£45.02</strong>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel garage-panel">
+              <div class="panel-head">
+                <h3>Garage Summary</h3>
+                <button class="soft-button" type="button">Edit vehicle</button>
+              </div>
+              <div class="garage-summary-card">
+                <div class="garage-summary-top">
+                  <div>
+                    <h4>Ford Fiesta</h4>
+                    <p>SN15 OAA • Petrol</p>
+                  </div>
+                  <span class="badge">Primary car</span>
+                </div>
+                <div class="garage-metrics">
+                  <div>
+                    <span class="label">Tank size</span>
+                    <strong>42 L</strong>
+                  </div>
+                  <div>
+                    <span class="label">Trips</span>
+                    <strong>48</strong>
+                  </div>
+                  <div>
+                    <span class="label">This year</span>
+                    <strong>£2,184</strong>
+                  </div>
+                  <div>
+                    <span class="label">Weather tagged</span>
+                    <strong>12 fills</strong>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel reports-panel">
+              <div class="panel-head">
+                <h3>Reports</h3>
+                <button class="soft-button" type="button">2026</button>
+              </div>
+              <div class="report-list">
+                <div class="report-item">
+                  <span>Fuel spend</span>
+                  <strong>£1,552</strong>
+                </div>
+                <div class="report-item">
+                  <span>Trip fuel</span>
+                  <strong>£214</strong>
+                </div>
+                <div class="report-item">
+                  <span>Ownership</span>
+                  <strong>£418</strong>
+                </div>
+                <div class="report-item total">
+                  <span>Total tracked</span>
+                  <strong>£2,184</strong>
+                </div>
+              </div>
+            </article>
+          </section>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

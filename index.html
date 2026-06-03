@@ -7,132 +7,170 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="shell">
-      <aside class="hero">
-        <div class="hero-topbar">
-          <p class="eyebrow">Track Fuel, Car, Trip costs</p>
-          <button
-            id="themeToggleBtn"
-            class="theme-toggle"
-            type="button"
-            aria-label="Switch color theme"
-            aria-pressed="false"
-          >
-            Dark mode
-          </button>
-        </div>
-        <h1>Road Ledger</h1>
-        <p class="hero-copy">
-          Track vehicles, fuel-ups, trips, spend, efficiency, and weather in a
-          single hosted dashboard with lightweight nickname-based profiles.
-        </p>
+      <aside class="sidebar">
+        <section class="brand-panel">
+          <div class="hero-topbar">
+            <p class="eyebrow soft">Road Ledger</p>
+            <button
+              id="themeToggleBtn"
+              class="theme-toggle"
+              type="button"
+              aria-label="Switch color theme"
+              aria-pressed="false"
+            >
+              Dark mode
+            </button>
+          </div>
+          <h1>Garage HQ</h1>
+          <p class="hero-copy">
+            Track fuel-ups, trips, yearly ownership costs, route plans, and weather
+            in one calmer workspace.
+          </p>
+        </section>
 
-        <section class="glass-card start-actions-card">
+        <nav class="sidebar-nav" aria-label="Primary">
+          <a class="nav-item active" href="#dashboardSection">
+            <span class="nav-icon dashboard-icon" aria-hidden="true"></span>
+            Dashboard
+          </a>
+          <a class="nav-item" href="#historySection">
+            <span class="nav-icon history-icon" aria-hidden="true"></span>
+            History
+          </a>
+          <a class="nav-item" href="#garageSection">
+            <span class="nav-icon garage-icon" aria-hidden="true"></span>
+            Garage
+          </a>
+          <a class="nav-item" href="#insightsSection">
+            <span class="nav-icon insights-icon" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+            Insights
+          </a>
+          <a class="nav-item" href="#settingsCard">
+            <span class="nav-icon settings-icon" aria-hidden="true"></span>
+            Settings
+          </a>
+        </nav>
+
+        <section class="sidebar-card profile-panel">
           <div class="section-heading compact">
             <div>
-              <p class="panel-label">Start here</p>
-              <strong>Open the sections you need</strong>
+              <p class="panel-label">Profile</p>
+              <strong id="profileTitle">Create your garage</strong>
             </div>
+            <span id="syncBadge" class="status-badge muted">Not connected</span>
           </div>
-          <p class="start-actions-copy">
-            Keep the workspace focused, then reveal setup and garage tools when
-            you need them.
-          </p>
-          <div class="action-row">
-            <button
-              id="showVehicleSectionBtn"
-              class="primary-button"
-              type="button"
-              aria-controls="vehicleCard"
-              aria-expanded="false"
-            >
-              Add a car
-            </button>
-            <button
-              id="showSettingsSectionBtn"
-              class="ghost-button"
-              type="button"
-              aria-controls="settingsCard"
-              aria-expanded="false"
-            >
-              Open settings
-            </button>
+
+          <form id="profileForm" class="stack-form">
+            <label>
+              Nickname
+              <input
+                id="profileNickname"
+                name="nickname"
+                required
+                maxlength="32"
+                placeholder="teo-runs"
+              />
+            </label>
+            <button type="submit" class="primary-button">Connect profile</button>
+          </form>
+
+          <div id="profileMeta" class="profile-meta"></div>
+
+          <div class="action-row compact-actions">
+            <button id="syncNowBtn" class="ghost-button" type="button">Sync now</button>
+            <button id="switchProfileBtn" class="ghost-button" type="button">Switch</button>
           </div>
         </section>
 
-        <div class="hero-panels">
-          <section class="glass-card">
-            <div class="section-heading compact">
-              <div>
-                <p class="panel-label">Profile</p>
-                <strong id="profileTitle">Create your garage</strong>
-              </div>
-              <span id="syncBadge" class="status-badge muted">Not connected</span>
+        <section class="sidebar-card weather-panel">
+          <p class="panel-label">Current conditions</p>
+          <div id="weatherSummary" class="weather-summary">
+            <strong>Weather not loaded</strong>
+            <span>Add a home city in settings to enable forecast snapshots.</span>
+          </div>
+        </section>
+
+        <section class="sidebar-card utility-panel">
+          <div class="section-heading compact">
+            <div>
+              <p class="panel-label">Quick tools</p>
+              <strong>Support and data tasks</strong>
             </div>
-
-            <form id="profileForm" class="stack-form">
-              <label>
-                Nickname
-                <input
-                  id="profileNickname"
-                  name="nickname"
-                  required
-                  maxlength="32"
-                  placeholder="teo-runs"
-                />
-              </label>
-              <button type="submit" class="primary-button">Connect profile</button>
-            </form>
-
-            <div id="profileMeta" class="profile-meta"></div>
-
-            <div class="action-row">
-              <button id="syncNowBtn" class="ghost-button" type="button">Sync now</button>
-              <button id="switchProfileBtn" class="ghost-button" type="button">Switch profile</button>
-            </div>
-          </section>
-
-          <section class="glass-card">
-            <p class="panel-label">Current conditions</p>
-            <div id="weatherSummary" class="weather-summary">
-              <strong>Weather not loaded</strong>
-              <span>Add a home city in settings to enable forecast snapshots.</span>
-            </div>
-          </section>
-
-          <section class="glass-card">
-            <p class="panel-label">Quick actions</p>
-            <div class="action-list">
-              <button id="seedDemoBtn" class="ghost-button" type="button">Load demo data</button>
-              <button id="backfillWeatherBtn" class="ghost-button" type="button">Backfill fill-up weather</button>
-              <button id="exportBtn" class="ghost-button" type="button">Export backup</button>
-              <label class="ghost-button file-button">
-                Import backup
-                <input id="importInput" type="file" accept=".csv,text/csv" />
-              </label>
-            </div>
-          </section>
-        </div>
+          </div>
+          <div class="action-list utility-actions">
+            <button id="seedDemoBtn" class="ghost-button" type="button">Load demo data</button>
+            <button id="backfillWeatherBtn" class="ghost-button" type="button">Backfill weather</button>
+            <button id="exportBtn" class="ghost-button" type="button">Export backup</button>
+            <label class="ghost-button file-button">
+              Import backup
+              <input id="importInput" type="file" accept=".csv,text/csv" />
+            </label>
+          </div>
+        </section>
       </aside>
 
-      <main class="content">
-        <section id="statsGrid" class="metric-sections"></section>
-
-        <section class="layout-grid">
-          <article class="card wide">
-            <div class="section-heading">
+      <main class="workspace">
+        <section id="dashboardSection" class="hero-panel card">
+          <div class="hero-copy-panel">
+            <p class="eyebrow">This month</p>
+            <h2>Fuel and travel dashboard</h2>
+            <p class="hero-support-copy">
+              A calmer overview of spend, efficiency, route activity, and ownership costs.
+            </p>
+            <div class="hero-action-row">
+              <button
+                id="showVehicleSectionBtn"
+                class="primary-button"
+                type="button"
+                aria-controls="vehicleCard"
+                aria-expanded="false"
+              >
+                Manage garage
+              </button>
+              <button
+                id="showSettingsSectionBtn"
+                class="ghost-button dark-ghost"
+                type="button"
+                aria-controls="settingsCard"
+                aria-expanded="false"
+              >
+                Open settings
+              </button>
+            </div>
+          </div>
+          <div class="hero-metric-panel">
+            <div class="section-heading compact hero-heading">
               <div>
-                <p class="eyebrow">Dashboard</p>
-                <h2>Fuel and travel trends</h2>
+                <p class="panel-label">Live view</p>
+                <strong>Current filter</strong>
               </div>
               <div class="section-actions">
                 <select id="vehicleFilter" aria-label="Filter by vehicle"></select>
+              </div>
+            </div>
+            <div id="statsGrid" class="metric-sections"></div>
+          </div>
+        </section>
+
+        <section id="garageSection" class="content-grid">
+          <article id="insightsSection" class="card wide dashboard-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Dashboard</p>
+                <h2>Trends and reports</h2>
+              </div>
+              <div class="section-actions">
                 <button
                   class="ghost-button dark-ghost section-toggle"
                   type="button"
@@ -170,10 +208,10 @@
             </div>
           </article>
 
-          <article id="vehicleCard" class="card" hidden>
+          <article id="vehicleCard" class="card side-card" hidden>
             <div class="section-heading">
               <div>
-                <p class="eyebrow">Vehicles</p>
+                <p class="eyebrow">Garage</p>
                 <h2>Add a car</h2>
               </div>
             </div>
@@ -239,7 +277,9 @@
             </form>
             <div id="vehicleList" class="list"></div>
           </article>
+        </section>
 
+        <section class="content-grid">
           <article class="card wide">
             <div class="section-heading">
               <div>
@@ -257,261 +297,63 @@
               </button>
             </div>
             <div id="fillUpsContent" data-fold-content="fillUps">
-            <form id="fillUpForm" class="form-grid">
-              <label>
-                Vehicle
-                <select name="vehicleId" required></select>
-              </label>
-              <label>
-                Date
-                <input name="date" type="date" required />
-              </label>
-              <label>
-                Odometer
-                <input name="odometer" type="number" min="0" step="0.1" required />
-              </label>
-              <label>
-                Volume (L)
-                <input name="liters" type="number" min="0" step="0.01" placeholder="Any two fields fill the third" />
-              </label>
-              <label>
-                Total cost
-                <input name="totalCost" type="number" min="0" step="0.01" placeholder="Any two fields fill the third" />
-              </label>
-              <label>
-                Price per litre
-                <input name="pricePerLiter" type="number" min="0" step="0.001" placeholder="Any two fields fill the third" />
-              </label>
-              <label>
-                Fuel station
-                <input name="station" placeholder="Shell Westminster" />
-              </label>
-              <label>
-                Partial fill?
-                <select name="isPartial">
-                  <option value="false">No, full tank</option>
-                  <option value="true">Yes</option>
-                </select>
-              </label>
-              <label class="wide-field">
-                Notes
-                <textarea
-                  name="notes"
-                  rows="3"
-                  placeholder="Traffic was heavy, tyres adjusted, long motorway drive..."
-                ></textarea>
-              </label>
-              <div id="fillUpCalcStatus" class="lookup-status empty wide-field">
-                Enter any two of price per litre, volume, or total cost.
-              </div>
-              <button type="submit" class="primary-button">Save fill-up</button>
-            </form>
-            </div>
-          </article>
-
-          <article class="card wide">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Trip Log</p>
-                <h2>Plan or save a trip</h2>
-              </div>
-              <button
-                class="ghost-button dark-ghost section-toggle"
-                type="button"
-                data-fold-toggle="trips"
-                aria-controls="tripsContent"
-                aria-expanded="true"
-              >
-                Hide
-              </button>
-            </div>
-            <div id="tripsContent" data-fold-content="trips">
-              <div class="trip-workspace">
-                <section class="trip-workspace-banner">
-                  <div>
-                    <p class="panel-label">Trip workspace</p>
-                    <strong>Choose how you want to work</strong>
-                    <p class="trip-workspace-copy">
-                      Plan the route first, then move across to save the final trip entry with fuel cost.
-                    </p>
-                  </div>
-                  <div class="workspace-switcher" role="tablist" aria-label="Trip workspace views">
-                    <button
-                      class="workspace-switch is-active"
-                      type="button"
-                      data-trip-workspace-target="planner"
-                      aria-controls="routePlannerCard"
-                      aria-pressed="true"
-                    >
-                      Route planner
-                    </button>
-                    <button
-                      class="workspace-switch"
-                      type="button"
-                      data-trip-workspace-target="trip"
-                      aria-controls="tripEntryCard"
-                      aria-pressed="false"
-                    >
-                      Add a trip
-                    </button>
-                  </div>
-                </section>
-
-                <div class="trip-workspace-grid">
-                  <section
-                    id="routePlannerCard"
-                    class="workspace-card is-active"
-                    aria-label="Route planner"
-                    role="tabpanel"
-                  >
-                    <div class="section-heading compact">
-                      <div>
-                        <p class="eyebrow">Route Planner</p>
-                        <h2>Plan the journey</h2>
-                      </div>
-                    </div>
-                    <form id="routePlannerForm" class="form-grid">
-                      <label>
-                        Vehicle
-                        <select name="vehicleId" required></select>
-                      </label>
-                      <label>
-                        Start location
-                        <input name="startLocation" placeholder="Home" />
-                      </label>
-                      <label>
-                        End location
-                        <input name="endLocation" placeholder="Office" />
-                      </label>
-                      <label>
-                        Waypoints
-                        <input
-                          name="routeWaypoints"
-                          placeholder="Optional stops, separated by commas"
-                        />
-                      </label>
-                      <div class="wide-field action-row">
-                        <button id="resolveRouteBtn" type="button" class="ghost-button dark-ghost">
-                          Check locations
-                        </button>
-                        <button id="planRouteBtn" type="button" class="ghost-button dark-ghost">
-                          Plan route
-                        </button>
-                      </div>
-                      <div id="routeResolutionSummary" class="lookup-status empty wide-field">
-                        We will show the resolved addresses here before route planning.
-                      </div>
-                      <div id="routePlanStatus" class="lookup-status empty wide-field">
-                        Plan a route from the saved locations to prefill trip distance.
-                      </div>
-                      <label>
-                        Planned distance
-                        <input name="plannedDistance" type="number" min="0" step="0.1" readonly />
-                      </label>
-                      <label>
-                        Planned duration
-                        <input name="plannedDuration" type="text" readonly />
-                      </label>
-                    </form>
-                  </section>
-
-                  <section
-                    id="tripEntryCard"
-                    class="workspace-card"
-                    aria-label="Trip entry"
-                    role="tabpanel"
-                    hidden
-                  >
-                    <div class="section-heading compact">
-                      <div>
-                        <p class="eyebrow">Trip Entry</p>
-                        <h2>Save the trip</h2>
-                      </div>
-                    </div>
-                    <form id="tripForm" class="form-grid">
-                      <label>
-                        Vehicle
-                        <select name="vehicleId" required></select>
-                      </label>
-                      <label>
-                        Date
-                        <input name="date" type="date" required />
-                      </label>
-                      <label>
-                        Start odometer
-                        <input
-                          name="startOdometer"
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          placeholder="Optional if you planned the route"
-                        />
-                      </label>
-                      <label>
-                        End odometer
-                        <input
-                          name="endOdometer"
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          placeholder="Optional if you planned the route"
-                        />
-                      </label>
-                      <label>
-                        Category
-                        <input name="category" placeholder="Commute, holiday, errands..." />
-                      </label>
-                      <label>
-                        Trip MPG (UK)
-                        <input name="tripMpgUk" type="number" min="0" step="0.1" placeholder="Pulled from the car profile" />
-                      </label>
-                      <label>
-                        Estimated fuel cost
-                        <input name="totalCost" type="number" min="0" step="0.01" readonly />
-                      </label>
-                      <label>
-                        Fuel used (L)
-                        <input name="litersUsed" type="number" min="0" step="0.01" placeholder="Overrides MPG estimate if entered" />
-                      </label>
-                      <label>
-                        Fuel price used
-                        <input name="fuelPricePerLiter" type="number" min="0" step="0.001" readonly />
-                      </label>
-                      <label>
-                        Planned distance
-                        <input name="plannedDistance" type="number" min="0" step="0.1" readonly />
-                      </label>
-                      <div id="tripCalcStatus" class="lookup-status empty wide-field">
-                        Trip fuel cost uses the previous fill-up price for this vehicle.
-                      </div>
-                      <label>
-                        Planned duration
-                        <input name="plannedDuration" type="text" readonly />
-                      </label>
-                      <div class="lookup-status empty wide-field">
-                        Route details come from the planner card next to this form.
-                      </div>
-                      <label class="wide-field">
-                        Notes
-                        <textarea
-                          name="notes"
-                          rows="3"
-                          placeholder="Long motorway run, city traffic, school pickup..."
-                        ></textarea>
-                      </label>
-                      <button type="submit" class="primary-button">Save trip</button>
-                    </form>
-                  </section>
+              <form id="fillUpForm" class="form-grid">
+                <label>
+                  Vehicle
+                  <select name="vehicleId" required></select>
+                </label>
+                <label>
+                  Date
+                  <input name="date" type="date" required />
+                </label>
+                <label>
+                  Odometer
+                  <input name="odometer" type="number" min="0" step="0.1" required />
+                </label>
+                <label>
+                  Volume (L)
+                  <input name="liters" type="number" min="0" step="0.01" placeholder="Any two fields fill the third" />
+                </label>
+                <label>
+                  Total cost
+                  <input name="totalCost" type="number" min="0" step="0.01" placeholder="Any two fields fill the third" />
+                </label>
+                <label>
+                  Price per litre
+                  <input name="pricePerLiter" type="number" min="0" step="0.001" placeholder="Any two fields fill the third" />
+                </label>
+                <label>
+                  Fuel station
+                  <input name="station" placeholder="Shell Westminster" />
+                </label>
+                <label>
+                  Partial fill?
+                  <select name="isPartial">
+                    <option value="false">No, full tank</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </label>
+                <label class="wide-field">
+                  Notes
+                  <textarea
+                    name="notes"
+                    rows="3"
+                    placeholder="Traffic was heavy, tyres adjusted, long motorway drive..."
+                  ></textarea>
+                </label>
+                <div id="fillUpCalcStatus" class="lookup-status empty wide-field">
+                  Enter any two of price per litre, volume, or total cost.
                 </div>
-              </div>
+                <button type="submit" class="primary-button">Save fill-up</button>
+              </form>
             </div>
           </article>
 
-          <article class="card wide">
+          <article class="card side-card">
             <div class="section-heading">
               <div>
-                <p class="eyebrow">Ownership Costs</p>
-                <h2>Log yearly car costs</h2>
+                <p class="eyebrow">Ownership</p>
+                <h2>Yearly car costs</h2>
               </div>
               <button
                 class="ghost-button dark-ghost section-toggle"
@@ -524,64 +366,264 @@
               </button>
             </div>
             <div id="ownershipContent" data-fold-content="ownership">
-            <form id="ownershipCostForm" class="form-grid">
-              <label>
-                Vehicle
-                <select name="vehicleId" required></select>
-              </label>
-              <label>
-                Date
-                <input name="date" type="date" required />
-              </label>
-              <label>
-                Cost type
-                <select name="category" required>
-                  <option value="service">Service</option>
-                  <option value="tax">Tax</option>
-                  <option value="carPayment">Car payment</option>
-                  <option value="insurance">Insurance</option>
-                </select>
-              </label>
-              <label>
-                Amount
-                <input name="totalCost" type="number" min="0" step="0.01" required />
-              </label>
-              <label class="wide-field">
-                Notes
-                <textarea
-                  name="notes"
-                  rows="3"
-                  placeholder="Annual premium, monthly finance payment, MOT + service, road tax renewal..."
-                ></textarea>
-              </label>
-              <button type="submit" class="primary-button">Save cost</button>
-            </form>
+              <form id="ownershipCostForm" class="form-grid single-column-form">
+                <label>
+                  Vehicle
+                  <select name="vehicleId" required></select>
+                </label>
+                <label>
+                  Date
+                  <input name="date" type="date" required />
+                </label>
+                <label>
+                  Cost type
+                  <select name="category" required>
+                    <option value="service">Service</option>
+                    <option value="tax">Tax</option>
+                    <option value="carPayment">Car payment</option>
+                    <option value="insurance">Insurance</option>
+                  </select>
+                </label>
+                <label>
+                  Amount
+                  <input name="totalCost" type="number" min="0" step="0.01" required />
+                </label>
+                <label class="wide-field">
+                  Notes
+                  <textarea
+                    name="notes"
+                    rows="3"
+                    placeholder="Annual premium, monthly finance payment, MOT + service, road tax renewal..."
+                  ></textarea>
+                </label>
+                <button type="submit" class="primary-button">Save cost</button>
+              </form>
 
-            <div class="section-heading cost-breakdown-heading">
-              <div>
-                <p class="eyebrow">Annual Breakdown</p>
-                <h2>Service, tax, payments, insurance</h2>
+              <div class="section-heading cost-breakdown-heading compact">
+                <div>
+                  <p class="panel-label">Annual Breakdown</p>
+                  <strong>Service, tax, payments, insurance</strong>
+                </div>
+              </div>
+              <div class="table-wrap compact-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Year</th>
+                      <th>Service</th>
+                      <th>Tax</th>
+                      <th>Car payments</th>
+                      <th>Insurance</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ownershipBreakdownBody"></tbody>
+                </table>
               </div>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Year</th>
-                    <th>Service</th>
-                    <th>Tax</th>
-                    <th>Car payments</th>
-                    <th>Insurance</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody id="ownershipBreakdownBody"></tbody>
-              </table>
-            </div>
-            </div>
           </article>
+        </section>
 
-          <article class="card wide">
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Trip Log</p>
+              <h2>Plan or save a trip</h2>
+            </div>
+            <button
+              class="ghost-button dark-ghost section-toggle"
+              type="button"
+              data-fold-toggle="trips"
+              aria-controls="tripsContent"
+              aria-expanded="true"
+            >
+              Hide
+            </button>
+          </div>
+          <div id="tripsContent" data-fold-content="trips">
+            <div class="trip-workspace">
+              <section class="trip-workspace-banner">
+                <div>
+                  <p class="panel-label">Trip workspace</p>
+                  <strong>Choose how you want to work</strong>
+                  <p class="trip-workspace-copy">
+                    Plan the route first, then move across to save the final trip entry with fuel cost.
+                  </p>
+                </div>
+                <div class="workspace-switcher" role="tablist" aria-label="Trip workspace views">
+                  <button
+                    class="workspace-switch is-active"
+                    type="button"
+                    data-trip-workspace-target="planner"
+                    aria-controls="routePlannerCard"
+                    aria-pressed="true"
+                  >
+                    Route planner
+                  </button>
+                  <button
+                    class="workspace-switch"
+                    type="button"
+                    data-trip-workspace-target="trip"
+                    aria-controls="tripEntryCard"
+                    aria-pressed="false"
+                  >
+                    Add a trip
+                  </button>
+                </div>
+              </section>
+
+              <div class="trip-workspace-grid">
+                <section
+                  id="routePlannerCard"
+                  class="workspace-card is-active"
+                  aria-label="Route planner"
+                  role="tabpanel"
+                >
+                  <div class="section-heading compact">
+                    <div>
+                      <p class="eyebrow">Route Planner</p>
+                      <h2>Plan the journey</h2>
+                    </div>
+                  </div>
+                  <form id="routePlannerForm" class="form-grid">
+                    <label>
+                      Vehicle
+                      <select name="vehicleId" required></select>
+                    </label>
+                    <label>
+                      Start location
+                      <input name="startLocation" placeholder="Home" />
+                    </label>
+                    <label>
+                      End location
+                      <input name="endLocation" placeholder="Office" />
+                    </label>
+                    <label>
+                      Waypoints
+                      <input
+                        name="routeWaypoints"
+                        placeholder="Optional stops, separated by commas"
+                      />
+                    </label>
+                    <div class="wide-field action-row">
+                      <button id="resolveRouteBtn" type="button" class="ghost-button dark-ghost">
+                        Check locations
+                      </button>
+                      <button id="planRouteBtn" type="button" class="ghost-button dark-ghost">
+                        Plan route
+                      </button>
+                    </div>
+                    <div id="routeResolutionSummary" class="lookup-status empty wide-field">
+                      We will show the resolved addresses here before route planning.
+                    </div>
+                    <div id="routePlanStatus" class="lookup-status empty wide-field">
+                      Plan a route from the saved locations to prefill trip distance.
+                    </div>
+                    <label>
+                      Planned distance
+                      <input name="plannedDistance" type="number" min="0" step="0.1" readonly />
+                    </label>
+                    <label>
+                      Planned duration
+                      <input name="plannedDuration" type="text" readonly />
+                    </label>
+                  </form>
+                </section>
+
+                <section
+                  id="tripEntryCard"
+                  class="workspace-card"
+                  aria-label="Trip entry"
+                  role="tabpanel"
+                  hidden
+                >
+                  <div class="section-heading compact">
+                    <div>
+                      <p class="eyebrow">Trip Entry</p>
+                      <h2>Save the trip</h2>
+                    </div>
+                  </div>
+                  <form id="tripForm" class="form-grid">
+                    <label>
+                      Vehicle
+                      <select name="vehicleId" required></select>
+                    </label>
+                    <label>
+                      Date
+                      <input name="date" type="date" required />
+                    </label>
+                    <label>
+                      Start odometer
+                      <input
+                        name="startOdometer"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        placeholder="Optional if you planned the route"
+                      />
+                    </label>
+                    <label>
+                      End odometer
+                      <input
+                        name="endOdometer"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        placeholder="Optional if you planned the route"
+                      />
+                    </label>
+                    <label>
+                      Category
+                      <input name="category" placeholder="Commute, holiday, errands..." />
+                    </label>
+                    <label>
+                      Trip MPG (UK)
+                      <input name="tripMpgUk" type="number" min="0" step="0.1" placeholder="Pulled from the car profile" />
+                    </label>
+                    <label>
+                      Estimated fuel cost
+                      <input name="totalCost" type="number" min="0" step="0.01" readonly />
+                    </label>
+                    <label>
+                      Fuel used (L)
+                      <input name="litersUsed" type="number" min="0" step="0.01" placeholder="Overrides MPG estimate if entered" />
+                    </label>
+                    <label>
+                      Fuel price used
+                      <input name="fuelPricePerLiter" type="number" min="0" step="0.001" readonly />
+                    </label>
+                    <label>
+                      Planned distance
+                      <input name="plannedDistance" type="number" min="0" step="0.1" readonly />
+                    </label>
+                    <div id="tripCalcStatus" class="lookup-status empty wide-field">
+                      Trip fuel cost uses the previous fill-up price for this vehicle.
+                    </div>
+                    <label>
+                      Planned duration
+                      <input name="plannedDuration" type="text" readonly />
+                    </label>
+                    <div class="lookup-status empty wide-field">
+                      Route details come from the planner card next to this form.
+                    </div>
+                    <label class="wide-field">
+                      Notes
+                      <textarea
+                        name="notes"
+                        rows="3"
+                        placeholder="Long motorway run, city traffic, school pickup..."
+                      ></textarea>
+                    </label>
+                    <button type="submit" class="primary-button">Save trip</button>
+                  </form>
+                </section>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="historySection" class="content-grid history-grid">
+          <article class="card wide history-card">
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Fuel History</p>
@@ -598,27 +640,27 @@
               </button>
             </div>
             <div id="fuelHistoryContent" data-fold-content="fuelHistory">
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Vehicle</th>
-                    <th>Distance</th>
-                    <th>Fuel</th>
-                    <th>Cost</th>
-                    <th>Efficiency</th>
-                    <th>Weather</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="fillUpTableBody"></tbody>
-              </table>
-            </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Vehicle</th>
+                      <th>Distance</th>
+                      <th>Fuel</th>
+                      <th>Cost</th>
+                      <th>Efficiency</th>
+                      <th>Weather</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="fillUpTableBody"></tbody>
+                </table>
+              </div>
             </div>
           </article>
 
-          <article class="card wide">
+          <article class="card side-card">
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Trip History</p>
@@ -635,23 +677,23 @@
               </button>
             </div>
             <div id="tripHistoryContent" data-fold-content="tripHistory">
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Vehicle</th>
-                    <th>Distance</th>
-                    <th>Category</th>
-                    <th>Cost</th>
-                    <th>Efficiency</th>
-                    <th>Weather</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="tripTableBody"></tbody>
-              </table>
-            </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Vehicle</th>
+                      <th>Distance</th>
+                      <th>Category</th>
+                      <th>Cost</th>
+                      <th>Efficiency</th>
+                      <th>Weather</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="tripTableBody"></tbody>
+                </table>
+              </div>
             </div>
           </article>
 
@@ -672,25 +714,25 @@
               </button>
             </div>
             <div id="ownershipHistoryContent" data-fold-content="ownershipHistory">
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Vehicle</th>
-                    <th>Type</th>
-                    <th>Cost</th>
-                    <th>Notes</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="ownershipCostTableBody"></tbody>
-              </table>
-            </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Vehicle</th>
+                      <th>Type</th>
+                      <th>Cost</th>
+                      <th>Notes</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="ownershipCostTableBody"></tbody>
+                </table>
+              </div>
             </div>
           </article>
 
-          <article id="settingsCard" class="card" hidden>
+          <article id="settingsCard" class="card side-card" hidden>
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Settings</p>
@@ -725,6 +767,14 @@
         </section>
       </main>
     </div>
+
+    <nav class="mobile-dock" aria-label="Mobile sections">
+      <a href="#dashboardSection">Dashboard</a>
+      <a href="#historySection">History</a>
+      <a href="#garageSection">Garage</a>
+      <a href="#insightsSection">Insights</a>
+      <a href="#settingsCard">Settings</a>
+    </nav>
 
     <template id="statCardTemplate">
       <article class="stat-card">
