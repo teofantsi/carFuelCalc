@@ -4,6 +4,11 @@ const SUPABASE_PUBLISHABLE_KEY =
   "sb_publishable_mEK9Y8QpniN3g62SH8CYog_ODItP59c";
 const API_URL = `${SUPABASE_URL}/functions/v1/road-ledger-api`;
 const BACKUP_CSV_VERSION = "1";
+const ROUTE_TYPE_MPG_FACTORS = {
+  city: 0.75,
+  mixed: 0.9,
+  motorway: 1.05,
+};
 const BACKUP_CSV_COLUMNS = [
   "backupVersion",
   "recordType",
@@ -49,6 +54,8 @@ const BACKUP_CSV_COLUMNS = [
   "endLocation",
   "routeWaypoints",
   "routeSource",
+  "routeType",
+  "routeAverageSpeedMph",
   "plannedDistance",
   "plannedDurationSeconds",
   "routePolyline",
@@ -263,6 +270,7 @@ function bindEvents() {
     "plannedDistance",
     "tripMpgUk",
     "litersUsed",
+    "routeType",
   ]) {
     getFormField(elements.tripForm, fieldName).addEventListener(
       "input",
@@ -2159,6 +2167,10 @@ async function handleTripSubmit(event) {
   const tripMpgUk = numberOrNull(formData.get("tripMpgUk"));
   const litersUsed = numberOrNull(formData.get("litersUsed"));
   const pricePerLiter = numberOrNull(formData.get("fuelPricePerLiter"));
+  const routeType = normalizeRouteType(formData.get("routeType"));
+  const routeAverageSpeedMph = numberOrNull(
+    getFormField(event.currentTarget, "plannedDistance").dataset.routeAverageSpeedMph
+  );
   const routeWaypoints = routeFields.routeWaypoints;
   const estimatedFuel = estimateTripFuel({
     vehicle,
@@ -2167,6 +2179,7 @@ async function handleTripSubmit(event) {
     distance,
     tripMpgUk,
     litersUsed,
+    routeType,
   });
   const fuelLiters = litersUsed ?? estimatedFuel.estimatedLiters ?? null;
   const totalCost =
@@ -2184,6 +2197,8 @@ async function handleTripSubmit(event) {
     plannedDistance,
     plannedDurationSeconds: parseDurationInputToSeconds(formData.get("plannedDuration")),
     routeSource: Number.isFinite(plannedDistance) ? "osrm" : null,
+    routeType,
+    routeAverageSpeedMph,
     routePolyline: getFormField(event.currentTarget, "plannedDistance").dataset.routePolyline || "",
     routeWaypoints,
     category: formData.get("category").toString().trim(),
@@ -2288,22 +2303,36 @@ async function handlePlanRoute() {
     const route = response.route || {};
     const plannedDistance = convertMetersToUnit(route.distanceMeters, vehicle.distanceUnit);
     const plannedDuration = formatDuration(route.durationSeconds);
+    const routeAverageSpeedMph = calculateAverageSpeedMph(
+      route.distanceMeters,
+      route.durationSeconds
+    );
+    const routeType = inferRouteType(route.distanceMeters, route.durationSeconds);
+    const routeTypeLabel = formatRouteType(routeType);
 
     getFormField(elements.routePlannerForm, "plannedDistance").value = Number.isFinite(plannedDistance)
       ? formatFixedInput(plannedDistance, 1)
       : "";
     getFormField(elements.routePlannerForm, "plannedDuration").value = plannedDuration;
+    getFormField(elements.routePlannerForm, "routeType").value = routeTypeLabel;
     getFormField(elements.routePlannerForm, "plannedDistance").dataset.routePolyline =
       route.polyline || "";
+    getFormField(elements.routePlannerForm, "plannedDistance").dataset.routeAverageSpeedMph =
+      Number.isFinite(routeAverageSpeedMph) ? formatFixedInput(routeAverageSpeedMph, 1) : "";
     getFormField(elements.tripForm, "plannedDistance").value = Number.isFinite(plannedDistance)
       ? formatFixedInput(plannedDistance, 1)
       : "";
     getFormField(elements.tripForm, "plannedDistance").dataset.routePolyline =
       route.polyline || "";
+    getFormField(elements.tripForm, "plannedDistance").dataset.routeAverageSpeedMph =
+      Number.isFinite(routeAverageSpeedMph) ? formatFixedInput(routeAverageSpeedMph, 1) : "";
     getFormField(elements.tripForm, "plannedDuration").value = plannedDuration;
+    getFormField(elements.tripForm, "routeType").value = routeType;
     elements.routePlanStatus.className = "lookup-status good wide-field";
     elements.routePlanStatus.textContent =
-      `${formatDistance(plannedDistance, vehicle.distanceUnit)} planned in ${plannedDuration}.`;
+      `${formatDistance(plannedDistance, vehicle.distanceUnit)} planned in ${plannedDuration}. ${routeTypeLabel} route inferred${
+        Number.isFinite(routeAverageSpeedMph) ? ` from ${formatNumber(routeAverageSpeedMph, 1)} mph average speed` : ""
+      }.`;
     syncTripFormDerivedFields();
   } catch (error) {
     resetPlannedRouteFields();
@@ -2569,21 +2598,31 @@ function resetPlannedRouteFields(options = {}) {
   resolvedRouteStops = null;
   const plannerDistanceField = getFormField(elements.routePlannerForm, "plannedDistance");
   const plannerDurationField = getFormField(elements.routePlannerForm, "plannedDuration");
+  const plannerRouteTypeField = getFormField(elements.routePlannerForm, "routeType");
   const plannedDistanceField = getFormField(elements.tripForm, "plannedDistance");
   const plannedDurationField = getFormField(elements.tripForm, "plannedDuration");
+  const tripRouteTypeField = getFormField(elements.tripForm, "routeType");
   if (plannerDistanceField) {
     plannerDistanceField.value = "";
     delete plannerDistanceField.dataset.routePolyline;
+    delete plannerDistanceField.dataset.routeAverageSpeedMph;
   }
   if (plannerDurationField) {
     plannerDurationField.value = "";
   }
+  if (plannerRouteTypeField) {
+    plannerRouteTypeField.value = "";
+  }
   if (plannedDistanceField) {
     plannedDistanceField.value = "";
     delete plannedDistanceField.dataset.routePolyline;
+    delete plannedDistanceField.dataset.routeAverageSpeedMph;
   }
   if (plannedDurationField) {
     plannedDurationField.value = "";
+  }
+  if (tripRouteTypeField) {
+    tripRouteTypeField.value = "mixed";
   }
   if (!keepResolutionSummary) {
     renderResolvedRouteSummary(null);
@@ -2628,6 +2667,7 @@ function syncTripFormDerivedFields() {
       : plannedDistance;
   const tripMpgUk = numberOrNull(getFormField(elements.tripForm, "tripMpgUk").value);
   const litersUsed = numberOrNull(getFormField(elements.tripForm, "litersUsed").value);
+  const routeType = normalizeRouteType(getFormField(elements.tripForm, "routeType").value);
   const estimate = estimateTripFuel({
     vehicle,
     date: getFormField(elements.tripForm, "date").value,
@@ -2635,6 +2675,7 @@ function syncTripFormDerivedFields() {
     distance,
     tripMpgUk,
     litersUsed,
+    routeType,
   });
 
   getFormField(elements.tripForm, "fuelPricePerLiter").value = Number.isFinite(
@@ -2734,9 +2775,14 @@ function syncTripPlannerOutputsFromPlanner() {
   } else {
     delete tripDistanceField.dataset.routePolyline;
   }
+  if (plannerDistanceField.dataset.routeAverageSpeedMph) {
+    tripDistanceField.dataset.routeAverageSpeedMph = plannerDistanceField.dataset.routeAverageSpeedMph;
+  } else {
+    delete tripDistanceField.dataset.routeAverageSpeedMph;
+  }
 }
 
-function estimateTripFuel({ vehicle, date, startOdometer, distance, tripMpgUk, litersUsed }) {
+function estimateTripFuel({ vehicle, date, startOdometer, distance, tripMpgUk, litersUsed, routeType }) {
   if (!vehicle) {
     return { estimatedLiters: null, pricePerLiter: null, totalCost: null, level: "empty", message: "" };
   }
@@ -2752,9 +2798,10 @@ function estimateTripFuel({ vehicle, date, startOdometer, distance, tripMpgUk, l
   }
 
   const previousPrice = getPreviousFillUpPrice(vehicle.id, date, startOdometer);
+  const adjustedMpgUk = adjustMpgForRouteType(tripMpgUk, routeType);
   const estimatedLiters = Number.isFinite(litersUsed) && litersUsed > 0
     ? litersUsed
-    : estimateLitersFromMpg(distance, vehicle.distanceUnit, tripMpgUk);
+    : estimateLitersFromMpg(distance, vehicle.distanceUnit, adjustedMpgUk);
 
   if (!Number.isFinite(previousPrice) || previousPrice <= 0) {
     return {
@@ -2784,7 +2831,7 @@ function estimateTripFuel({ vehicle, date, startOdometer, distance, tripMpgUk, l
     level: "good",
     message: Number.isFinite(litersUsed) && litersUsed > 0
       ? `Using ${formatNumber(estimatedLiters, 2)} L at ${formatCurrency(previousPrice)}/L from the previous fill-up.`
-      : `Using ${formatNumber(tripMpgUk, 1)} mpg UK and ${formatCurrency(previousPrice)}/L from the previous fill-up.`,
+      : `Using ${formatNumber(adjustedMpgUk, 1)} mpg UK after ${formatRouteType(routeType).toLowerCase()} adjustment and ${formatCurrency(previousPrice)}/L from the previous fill-up.`,
   };
 }
 
@@ -2824,6 +2871,60 @@ function estimateLitersFromMpg(distance, distanceUnit, mpgUk) {
 
   const miles = distanceUnit === "mi" ? distance : distance / 1.60934;
   return roundMaybe((miles / mpgUk) * 4.54609, 2);
+}
+
+function adjustMpgForRouteType(mpgUk, routeType) {
+  if (!Number.isFinite(mpgUk) || mpgUk <= 0) {
+    return null;
+  }
+  return roundMaybe(mpgUk * getRouteTypeMpgFactor(routeType), 1);
+}
+
+function getRouteTypeMpgFactor(routeType) {
+  return ROUTE_TYPE_MPG_FACTORS[normalizeRouteType(routeType)] ?? ROUTE_TYPE_MPG_FACTORS.mixed;
+}
+
+function normalizeRouteType(routeType) {
+  const normalized = String(routeType || "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(ROUTE_TYPE_MPG_FACTORS, normalized)
+    ? normalized
+    : "mixed";
+}
+
+function calculateAverageSpeedMph(distanceMeters, durationSeconds) {
+  if (
+    !Number.isFinite(distanceMeters) ||
+    !Number.isFinite(durationSeconds) ||
+    distanceMeters <= 0 ||
+    durationSeconds <= 0
+  ) {
+    return null;
+  }
+
+  return (distanceMeters / 1609.34) / (durationSeconds / 3600);
+}
+
+function inferRouteType(distanceMeters, durationSeconds) {
+  const averageMph = calculateAverageSpeedMph(distanceMeters, durationSeconds);
+  if (!Number.isFinite(averageMph)) {
+    return "mixed";
+  }
+  if (averageMph < 25) {
+    return "city";
+  }
+  if (averageMph < 50) {
+    return "mixed";
+  }
+  return "motorway";
+}
+
+function formatRouteType(routeType) {
+  const labels = {
+    city: "City",
+    mixed: "Mixed",
+    motorway: "Motorway",
+  };
+  return labels[normalizeRouteType(routeType)];
 }
 
 function parseTripWaypoints(value) {
@@ -2982,6 +3083,8 @@ function buildBackupCsv() {
       endLocation: trip.endLocation,
       routeWaypoints: Array.isArray(trip.routeWaypoints) ? trip.routeWaypoints.join(", ") : "",
       routeSource: trip.routeSource,
+      routeType: normalizeRouteType(trip.routeType),
+      routeAverageSpeedMph: trip.routeAverageSpeedMph,
       plannedDistance: trip.plannedDistance,
       plannedDurationSeconds: trip.plannedDurationSeconds,
       routePolyline: trip.routePolyline,
@@ -3103,6 +3206,8 @@ function importRoadLedgerRows(rows) {
             endLocation: row.endLocation || "",
             routeWaypoints: parseTripWaypoints(row.routeWaypoints || ""),
             routeSource: row.routeSource || null,
+            routeType: normalizeRouteType(row.routeType),
+            routeAverageSpeedMph: parseNullableNumber(row.routeAverageSpeedMph),
             plannedDistance: parseNullableNumber(row.plannedDistance),
             plannedDurationSeconds: parseNullableNumber(row.plannedDurationSeconds),
             routePolyline: row.routePolyline || "",
@@ -3522,6 +3627,7 @@ function makeDemoTrip(
     fuelPricePerLiter,
     startLocation,
     endLocation,
+    routeType: "mixed",
     notes: "",
     weather: null,
   };
@@ -3926,10 +4032,14 @@ function getTripFuelLiters(trip) {
     return trip.litersUsed;
   }
   const vehicle = getVehicleById(trip.vehicleId);
+  const adjustedMpgUk = adjustMpgForRouteType(
+    trip.tripMpgUk ?? getVehicleProfileMpgUk(vehicle),
+    trip.routeType
+  );
   return estimateLitersFromMpg(
     trip.distance,
     vehicle?.distanceUnit || "km",
-    trip.tripMpgUk ?? getVehicleProfileMpgUk(vehicle)
+    adjustedMpgUk
   );
 }
 
@@ -3938,7 +4048,8 @@ function buildTripConsumptionMeta(trip) {
     return `${formatNumber(trip.litersUsed, 2)} L used`;
   }
   if (Number.isFinite(trip.tripMpgUk) && trip.tripMpgUk > 0) {
-    return `${formatNumber(trip.tripMpgUk, 1)} mpg UK profile`;
+    const adjustedMpgUk = adjustMpgForRouteType(trip.tripMpgUk, trip.routeType);
+    return `${formatNumber(adjustedMpgUk, 1)} mpg UK ${formatRouteType(trip.routeType).toLowerCase()}`;
   }
   return "No MPG or litres saved";
 }
