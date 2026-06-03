@@ -193,6 +193,10 @@ function getSubmitButton(form) {
   return form?.querySelector('button[type="submit"]');
 }
 
+function addFieldListener(form, name, eventName, handler) {
+  getFormField(form, name)?.addEventListener(eventName, handler);
+}
+
 void init();
 
 async function init() {
@@ -296,7 +300,7 @@ function bindEvents() {
     resetPlannedRouteFields();
     syncTripFormDerivedFields();
   });
-  getFormField(elements.routePlannerForm, "isRoundTrip").addEventListener("change", () => {
+  addFieldListener(elements.routePlannerForm, "isRoundTrip", "change", () => {
     syncPlannedRouteOutputsFromBase();
     syncTripFormDerivedFields();
   });
@@ -2612,7 +2616,10 @@ function resetTripFormDerivedState() {
   getFormField(elements.tripForm, "tripMpgUk").value = "";
   getFormField(elements.tripForm, "totalCost").value = "";
   getFormField(elements.tripForm, "fuelPricePerLiter").value = "";
-  getFormField(elements.routePlannerForm, "totalCost").value = "";
+  const plannerTotalCostField = getFormField(elements.routePlannerForm, "totalCost");
+  if (plannerTotalCostField) {
+    plannerTotalCostField.value = "";
+  }
   elements.tripCalcStatus.className = "lookup-status empty wide-field";
   elements.tripCalcStatus.textContent =
     "Trip fuel cost uses the previous fill-up price for this vehicle.";
@@ -2718,9 +2725,12 @@ function syncTripFormDerivedFields() {
   getFormField(elements.tripForm, "totalCost").value = Number.isFinite(estimate.totalCost)
     ? formatFixedInput(estimate.totalCost, 2)
     : "";
-  getFormField(elements.routePlannerForm, "totalCost").value = Number.isFinite(estimate.totalCost)
-    ? formatFixedInput(estimate.totalCost, 2)
-    : "";
+  const plannerTotalCostField = getFormField(elements.routePlannerForm, "totalCost");
+  if (plannerTotalCostField) {
+    plannerTotalCostField.value = Number.isFinite(estimate.totalCost)
+      ? formatFixedInput(estimate.totalCost, 2)
+      : "";
+  }
 
   if (estimate.message) {
     elements.tripCalcStatus.className = `lookup-status ${estimate.level} wide-field`;
