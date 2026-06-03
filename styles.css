@@ -422,18 +422,26 @@ textarea {
 }
 
 .trip-workspace-grid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
 }
 
 .workspace-card {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
   padding: 18px;
-  box-shadow: inset 0 0 0 1px transparent;
+  background: var(--card-strong);
+  box-shadow: var(--shadow);
   transition: box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease;
 }
 
 .workspace-card.is-active {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: var(--accent);
+  box-shadow:
+    var(--shadow),
+    inset 0 0 0 1px rgba(203, 93, 45, 0.22);
 }
 
 .workspace-switcher {
@@ -443,17 +451,30 @@ textarea {
 }
 
 .workspace-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 11px 16px;
-  background: transparent;
+  background: var(--field-bg);
   color: var(--ink);
+  font-weight: 600;
   cursor: pointer;
-  transition: transform 150ms ease, background 150ms ease, border-color 150ms ease;
+  box-shadow: 0 10px 24px rgba(80, 49, 20, 0.08);
+  transition:
+    transform 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease;
 }
 
 .workspace-switch:hover {
   transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(80, 49, 20, 0.12);
 }
 
 .workspace-switch.is-active {
@@ -465,6 +486,14 @@ textarea {
 .resolved-route-list {
   display: grid;
   gap: 8px;
+}
+
+.workspace-card .section-heading {
+  margin-bottom: 0;
+}
+
+.workspace-card .eyebrow {
+  margin-bottom: 6px;
 }
 
 .wide-field {
@@ -1009,6 +1038,14 @@ th {
   .trip-workspace-banner {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .workspace-switcher {
+    width: 100%;
+  }
+
+  .workspace-switch {
+    flex: 1 1 auto;
   }
 
   .command-center,
