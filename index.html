@@ -16,19 +16,17 @@
     <div class="shell">
       <aside class="sidebar">
         <section class="brand-panel">
-          <div class="hero-topbar">
-            <p class="eyebrow soft">Road Ledger</p>
-            <button
-              id="themeToggleBtn"
-              class="theme-toggle"
-              type="button"
-              aria-label="Switch color theme"
-              aria-pressed="false"
-            >
-              Dark mode
-            </button>
-          </div>
-          <h1>Garage HQ</h1>
+          <p class="eyebrow soft">Road Ledger</p>
+          <h1>Road Ledger</h1>
+          <button
+            id="themeToggleBtn"
+            class="theme-toggle theme-toggle-inline"
+            type="button"
+            aria-label="Switch color theme"
+            aria-pressed="false"
+          >
+            Dark mode
+          </button>
           <p class="hero-copy">
             Track fuel-ups, trips, yearly ownership costs, route plans, and weather
             in one calmer workspace.
@@ -498,6 +496,13 @@
                       End location
                       <input name="endLocation" placeholder="Office" />
                     </label>
+                    <label class="planner-toggle">
+                      <span>Trip shape</span>
+                      <span class="planner-toggle-control">
+                        <input name="isRoundTrip" type="checkbox" />
+                        <span>Round trip</span>
+                      </span>
+                    </label>
                     <label>
                       Waypoints
                       <input
@@ -530,6 +535,10 @@
                     <label>
                       Route type
                       <input name="routeType" type="text" readonly />
+                    </label>
+                    <label>
+                      Estimated fuel cost
+                      <input name="totalCost" type="number" min="0" step="0.01" readonly />
                     </label>
                   </form>
                 </section>

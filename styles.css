@@ -356,6 +356,18 @@ h1 {
   color: #fffdf8;
 }
 
+.theme-toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  min-height: 34px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+}
+
 .ghost-button {
   background: var(--chip);
   color: var(--ink);
@@ -779,6 +791,14 @@ textarea:disabled {
 .chart-axis-text,
 .chart-callout {
   fill: var(--muted);
+  font-size: 6.5px;
+  letter-spacing: 0.02em;
+}
+
+.chart-callout {
+  font-size: 6px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .insight-list {
@@ -903,6 +923,27 @@ td strong {
 .workspace-switch.is-active {
   background: #25221f;
   color: #fff;
+}
+
+.planner-toggle {
+  align-self: end;
+}
+
+.planner-toggle-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+
+.planner-toggle-control input {
+  width: auto;
+  min-height: auto;
+  margin: 0;
 }
 
 .command-label {

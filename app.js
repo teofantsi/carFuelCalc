@@ -296,6 +296,10 @@ function bindEvents() {
     resetPlannedRouteFields();
     syncTripFormDerivedFields();
   });
+  getFormField(elements.routePlannerForm, "isRoundTrip").addEventListener("change", () => {
+    syncPlannedRouteOutputsFromBase();
+    syncTripFormDerivedFields();
+  });
   getFormField(elements.tripForm, "vehicleId").addEventListener("change", () => {
     syncPlannerVehicleFromTrip();
     resetPlannedRouteFields();
@@ -1236,10 +1240,6 @@ function buildReports(fillUps, trips) {
   const weatherImpact = summarizeWeatherImpact(fillUps);
   const vehicleComparison = summarizeVehicleComparison(fillUps, trips);
   const forecast = projectNextMonthSpend(fillUps, trips);
-  const mileageLogged = calculateLoggedMileage(
-    fillUps,
-    totals.distanceUnit === "mixed" ? "km" : totals.distanceUnit
-  );
   const longestTripDistance = maxOf(
     trips.map((trip) =>
       normalizeTripDistance(
@@ -1248,7 +1248,15 @@ function buildReports(fillUps, trips) {
       )
     )
   );
-  const currentYearDistance = yearSeries.at(-1)?.tripDistance || 0;
+  const actualMileageCovered = calculateLoggedMileage(
+    fillUps,
+    totals.distanceUnit === "mixed" ? "km" : totals.distanceUnit
+  );
+  const currentYearDistance = calculateLoggedMileage(
+    fillUps,
+    totals.distanceUnit === "mixed" ? "km" : totals.distanceUnit,
+    { year: new Date().getFullYear() }
+  );
   const monthlyDistanceAverage = monthSeries.length
     ? totals.tripDistance / monthSeries.length
     : 0;
@@ -1292,11 +1300,11 @@ function buildReports(fillUps, trips) {
     {
       section: "distance",
       title: "Distance travelled report",
-      summary: "A dedicated summary of total miles or kilometres covered across recorded trips.",
+      summary: "Separate actual odometer mileage from trip entries so historical trips do not inflate total distance covered.",
       badge: trips.length ? `${trips.length} trips tracked` : "",
       metrics: [
-        { label: "All distance", value: formatDistance(totals.tripDistance, totals.distanceUnit) },
-        { label: "Mileage logged", value: formatDistance(mileageLogged, totals.distanceUnit) },
+        { label: "Actual mileage covered", value: formatDistance(actualMileageCovered, totals.distanceUnit) },
+        { label: "Trip distance logged", value: formatDistance(totals.tripDistance, totals.distanceUnit) },
         { label: "This year", value: formatDistance(currentYearDistance, totals.distanceUnit) },
         { label: "Avg per trip", value: formatDistance(totals.averageTripDistance, totals.distanceUnit) },
         { label: "Avg per month", value: formatDistance(monthlyDistanceAverage, totals.distanceUnit) },
@@ -1307,10 +1315,10 @@ function buildReports(fillUps, trips) {
     {
       section: "performance",
       title: "Trip report",
-      summary: "Distance, trip mix, and estimated fuel cost for driving activity.",
+      summary: "Trip-only distance, trip mix, and estimated fuel cost for driving activity.",
       badge: `${trips.length} trips`,
       metrics: [
-        { label: "Year distance", value: formatDistance(currentYearDistance, totals.distanceUnit) },
+        { label: "Trip distance", value: formatDistance(totals.tripDistance, totals.distanceUnit) },
         { label: "Avg trip", value: formatDistance(totals.averageTripDistance, totals.distanceUnit) },
         { label: "Longest trip", value: formatDistance(longestTripDistance, totals.distanceUnit) },
         { label: "Top category", value: tripCategories[0] ? `${tripCategories[0].label} · ${tripCategories[0].count}` : "Pending" },
@@ -1500,7 +1508,13 @@ function summarizeVehicleComparison(fillUps, trips) {
       metrics: [
         { label: "All-time cost", value: formatCurrency(costTotals.allTimeTotal) },
         { label: "This year", value: formatCurrency(costTotals.currentYearTotal) },
-        { label: "Distance", value: formatDistance(totals.tripDistance, totals.distanceUnit) },
+        {
+          label: "Actual mileage",
+          value: formatDistance(
+            calculateLoggedMileage(vehicleFillUps, totals.distanceUnit === "mixed" ? "km" : totals.distanceUnit),
+            totals.distanceUnit
+          ),
+        },
         { label: "Avg efficiency", value: totals.averageEfficiencyLabel },
         { label: "Fill-ups", value: String(vehicleFillUps.length) },
       ],
@@ -2301,38 +2315,29 @@ async function handlePlanRoute() {
       resolvedStops: resolvedRouteStops,
     });
     const route = response.route || {};
-    const plannedDistance = convertMetersToUnit(route.distanceMeters, vehicle.distanceUnit);
-    const plannedDuration = formatDuration(route.durationSeconds);
     const routeAverageSpeedMph = calculateAverageSpeedMph(
       route.distanceMeters,
       route.durationSeconds
     );
     const routeType = inferRouteType(route.distanceMeters, route.durationSeconds);
+    const plannerDistanceField = getFormField(elements.routePlannerForm, "plannedDistance");
+    plannerDistanceField.dataset.routeBaseDistanceMeters = String(route.distanceMeters || "");
+    plannerDistanceField.dataset.routeBaseDurationSeconds = String(route.durationSeconds || "");
+    plannerDistanceField.dataset.routeBaseType = routeType;
+    plannerDistanceField.dataset.routePolyline = route.polyline || "";
+    plannerDistanceField.dataset.routeAverageSpeedMph =
+      Number.isFinite(routeAverageSpeedMph) ? formatFixedInput(routeAverageSpeedMph, 1) : "";
+    syncPlannedRouteOutputsFromBase();
+    const plannedDistance = numberOrNull(plannerDistanceField.value);
+    const plannedDuration = getFormField(elements.routePlannerForm, "plannedDuration").value;
     const routeTypeLabel = formatRouteType(routeType);
-
-    getFormField(elements.routePlannerForm, "plannedDistance").value = Number.isFinite(plannedDistance)
-      ? formatFixedInput(plannedDistance, 1)
-      : "";
-    getFormField(elements.routePlannerForm, "plannedDuration").value = plannedDuration;
-    getFormField(elements.routePlannerForm, "routeType").value = routeTypeLabel;
-    getFormField(elements.routePlannerForm, "plannedDistance").dataset.routePolyline =
-      route.polyline || "";
-    getFormField(elements.routePlannerForm, "plannedDistance").dataset.routeAverageSpeedMph =
-      Number.isFinite(routeAverageSpeedMph) ? formatFixedInput(routeAverageSpeedMph, 1) : "";
-    getFormField(elements.tripForm, "plannedDistance").value = Number.isFinite(plannedDistance)
-      ? formatFixedInput(plannedDistance, 1)
-      : "";
-    getFormField(elements.tripForm, "plannedDistance").dataset.routePolyline =
-      route.polyline || "";
-    getFormField(elements.tripForm, "plannedDistance").dataset.routeAverageSpeedMph =
-      Number.isFinite(routeAverageSpeedMph) ? formatFixedInput(routeAverageSpeedMph, 1) : "";
-    getFormField(elements.tripForm, "plannedDuration").value = plannedDuration;
-    getFormField(elements.tripForm, "routeType").value = routeType;
     elements.routePlanStatus.className = "lookup-status good wide-field";
     elements.routePlanStatus.textContent =
       `${formatDistance(plannedDistance, vehicle.distanceUnit)} planned in ${plannedDuration}. ${routeTypeLabel} route inferred${
-        Number.isFinite(routeAverageSpeedMph) ? ` from ${formatNumber(routeAverageSpeedMph, 1)} mph average speed` : ""
-      }.`;
+        getPlannerRoundTripEnabled() ? " Round trip applied." : ""
+      }${
+        Number.isFinite(routeAverageSpeedMph) ? ` ${formatNumber(routeAverageSpeedMph, 1)} mph average speed.` : "."
+      }`;
     syncTripFormDerivedFields();
   } catch (error) {
     resetPlannedRouteFields();
@@ -2588,6 +2593,7 @@ function resetTripFormDerivedState() {
   getFormField(elements.tripForm, "tripMpgUk").value = "";
   getFormField(elements.tripForm, "totalCost").value = "";
   getFormField(elements.tripForm, "fuelPricePerLiter").value = "";
+  getFormField(elements.routePlannerForm, "totalCost").value = "";
   elements.tripCalcStatus.className = "lookup-status empty wide-field";
   elements.tripCalcStatus.textContent =
     "Trip fuel cost uses the previous fill-up price for this vehicle.";
@@ -2599,6 +2605,7 @@ function resetPlannedRouteFields(options = {}) {
   const plannerDistanceField = getFormField(elements.routePlannerForm, "plannedDistance");
   const plannerDurationField = getFormField(elements.routePlannerForm, "plannedDuration");
   const plannerRouteTypeField = getFormField(elements.routePlannerForm, "routeType");
+  const plannerTotalCostField = getFormField(elements.routePlannerForm, "totalCost");
   const plannedDistanceField = getFormField(elements.tripForm, "plannedDistance");
   const plannedDurationField = getFormField(elements.tripForm, "plannedDuration");
   const tripRouteTypeField = getFormField(elements.tripForm, "routeType");
@@ -2606,12 +2613,18 @@ function resetPlannedRouteFields(options = {}) {
     plannerDistanceField.value = "";
     delete plannerDistanceField.dataset.routePolyline;
     delete plannerDistanceField.dataset.routeAverageSpeedMph;
+    delete plannerDistanceField.dataset.routeBaseDistanceMeters;
+    delete plannerDistanceField.dataset.routeBaseDurationSeconds;
+    delete plannerDistanceField.dataset.routeBaseType;
   }
   if (plannerDurationField) {
     plannerDurationField.value = "";
   }
   if (plannerRouteTypeField) {
     plannerRouteTypeField.value = "";
+  }
+  if (plannerTotalCostField) {
+    plannerTotalCostField.value = "";
   }
   if (plannedDistanceField) {
     plannedDistanceField.value = "";
@@ -2684,6 +2697,9 @@ function syncTripFormDerivedFields() {
     ? formatFixedInput(estimate.pricePerLiter, 3)
     : "";
   getFormField(elements.tripForm, "totalCost").value = Number.isFinite(estimate.totalCost)
+    ? formatFixedInput(estimate.totalCost, 2)
+    : "";
+  getFormField(elements.routePlannerForm, "totalCost").value = Number.isFinite(estimate.totalCost)
     ? formatFixedInput(estimate.totalCost, 2)
     : "";
 
@@ -2764,11 +2780,16 @@ function syncPlannerVehicleFromTrip() {
 function syncTripPlannerOutputsFromPlanner() {
   const plannerDistanceField = getFormField(elements.routePlannerForm, "plannedDistance");
   const plannerDurationField = getFormField(elements.routePlannerForm, "plannedDuration");
+  const plannerRouteTypeField = getFormField(elements.routePlannerForm, "routeType");
   const tripDistanceField = getFormField(elements.tripForm, "plannedDistance");
   const tripDurationField = getFormField(elements.tripForm, "plannedDuration");
+  const tripRouteTypeField = getFormField(elements.tripForm, "routeType");
 
   tripDistanceField.value = plannerDistanceField.value;
   tripDurationField.value = plannerDurationField.value;
+  tripRouteTypeField.value = normalizeRouteType(
+    String(plannerRouteTypeField?.value || "").toLowerCase()
+  );
 
   if (plannerDistanceField.dataset.routePolyline) {
     tripDistanceField.dataset.routePolyline = plannerDistanceField.dataset.routePolyline;
@@ -2780,6 +2801,35 @@ function syncTripPlannerOutputsFromPlanner() {
   } else {
     delete tripDistanceField.dataset.routeAverageSpeedMph;
   }
+}
+
+function syncPlannedRouteOutputsFromBase() {
+  const plannerDistanceField = getFormField(elements.routePlannerForm, "plannedDistance");
+  const baseDistanceMeters = numberOrNull(plannerDistanceField.dataset.routeBaseDistanceMeters);
+  const baseDurationSeconds = numberOrNull(plannerDistanceField.dataset.routeBaseDurationSeconds);
+  const baseRouteType = normalizeRouteType(plannerDistanceField.dataset.routeBaseType);
+  const vehicle = getVehicleById(getFormField(elements.routePlannerForm, "vehicleId").value);
+
+  if (!vehicle || !Number.isFinite(baseDistanceMeters) || !Number.isFinite(baseDurationSeconds)) {
+    syncTripPlannerOutputsFromPlanner();
+    return;
+  }
+
+  const multiplier = getPlannerRoundTripEnabled() ? 2 : 1;
+  const plannedDistance = convertMetersToUnit(baseDistanceMeters * multiplier, vehicle.distanceUnit);
+  const plannedDuration = formatDuration(baseDurationSeconds * multiplier);
+
+  plannerDistanceField.value = Number.isFinite(plannedDistance)
+    ? formatFixedInput(plannedDistance, 1)
+    : "";
+  getFormField(elements.routePlannerForm, "plannedDuration").value = plannedDuration;
+  getFormField(elements.routePlannerForm, "routeType").value = formatRouteType(baseRouteType);
+
+  syncTripPlannerOutputsFromPlanner();
+}
+
+function getPlannerRoundTripEnabled() {
+  return Boolean(getFormField(elements.routePlannerForm, "isRoundTrip")?.checked);
 }
 
 function estimateTripFuel({ vehicle, date, startOdometer, distance, tripMpgUk, litersUsed, routeType }) {
@@ -3818,7 +3868,8 @@ function buildYearlySpendSeries(fillUps, trips, ownershipCosts = []) {
     .map(([year, totals]) => ({ year, ...totals }));
 }
 
-function calculateLoggedMileage(fillUps, targetUnit = "km") {
+function calculateLoggedMileage(fillUps, targetUnit = "km", options = {}) {
+  const targetYear = Number.isFinite(Number(options.year)) ? String(options.year) : "";
   const byVehicle = new Map();
 
   for (const entry of fillUps) {
@@ -3838,19 +3889,27 @@ function calculateLoggedMileage(fillUps, targetUnit = "km") {
     const sorted = [...entries].sort(
       (a, b) => a.date.localeCompare(b.date) || a.odometer - b.odometer
     );
-    const first = sorted[0].odometer;
-    const last = sorted.at(-1).odometer;
-    const distance = last - first;
-    if (distance <= 0) {
-      continue;
-    }
     const sourceUnit = getVehicleById(vehicleId)?.distanceUnit || "km";
-    total +=
-      sourceUnit === targetUnit
-        ? distance
-        : sourceUnit === "mi"
-          ? distance * 1.60934
-          : distance / 1.60934;
+
+    for (let index = 1; index < sorted.length; index += 1) {
+      const previous = sorted[index - 1];
+      const current = sorted[index];
+      const distance = current.odometer - previous.odometer;
+
+      if (distance <= 0) {
+        continue;
+      }
+      if (targetYear && !String(current.date || "").startsWith(targetYear)) {
+        continue;
+      }
+
+      total +=
+        sourceUnit === targetUnit
+          ? distance
+          : sourceUnit === "mi"
+            ? distance * 1.60934
+            : distance / 1.60934;
+    }
   }
 
   return total;
