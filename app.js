@@ -312,11 +312,30 @@ function bindEvents() {
   elements.seedDemoBtn.addEventListener("click", () => void seedDemoData());
   elements.backfillWeatherBtn.addEventListener("click", () => void backfillFillUpWeather());
   elements.chartGrid.addEventListener("click", handleDashboardFocusClick);
+  for (const link of document.querySelectorAll("[data-mobile-reveal]")) {
+    link.addEventListener("click", handleMobileRevealLink);
+  }
 }
 
 function handleViewportChange(event) {
   syncResponsiveState(false, event.matches);
   render();
+}
+
+function handleMobileRevealLink(event) {
+  const sectionKey = event.currentTarget.dataset.mobileReveal;
+  const targetSelector = event.currentTarget.getAttribute("href");
+  if (!sectionKey || !targetSelector?.startsWith("#")) {
+    return;
+  }
+
+  event.preventDefault();
+  sectionVisibility[sectionKey] = true;
+  renderSectionVisibility();
+  document.querySelector(targetSelector)?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
 }
 
 function loadState() {

@@ -570,6 +570,12 @@ h1 {
   align-self: start;
 }
 
+.section-anchor {
+  display: block;
+  height: 0;
+  scroll-margin-top: 18px;
+}
+
 [hidden],
 #vehicleCard[hidden],
 #settingsCard[hidden],

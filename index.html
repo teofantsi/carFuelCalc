@@ -161,7 +161,7 @@
           </div>
         </section>
 
-        <section id="garageSection" class="content-grid">
+        <section class="content-grid">
           <article id="insightsSection" class="card wide dashboard-card">
             <div class="section-heading">
               <div>
@@ -207,6 +207,7 @@
           </article>
 
           <article id="vehicleCard" class="card side-card" hidden>
+            <span id="garageSection" class="section-anchor" aria-hidden="true"></span>
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Garage</p>
@@ -754,6 +755,7 @@
           </article>
 
           <article id="settingsCard" class="card side-card" hidden>
+            <span id="settingsSection" class="section-anchor" aria-hidden="true"></span>
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Settings</p>
@@ -792,9 +794,9 @@
     <nav class="mobile-dock" aria-label="Mobile sections">
       <a href="#dashboardSection">Dashboard</a>
       <a href="#historySection">History</a>
-      <a href="#garageSection">Garage</a>
+      <a href="#garageSection" data-mobile-reveal="vehicle">Garage</a>
       <a href="#insightsSection">Insights</a>
-      <a href="#settingsCard">Settings</a>
+      <a href="#settingsSection" data-mobile-reveal="settings">Settings</a>
     </nav>
 
     <template id="statCardTemplate">
