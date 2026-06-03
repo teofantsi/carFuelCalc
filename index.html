@@ -42,7 +42,7 @@
             <span class="nav-icon history-icon" aria-hidden="true"></span>
             History
           </a>
-          <a class="nav-item" href="#garageSection">
+          <a class="nav-item" href="#garageSection" data-reveal-section="vehicle">
             <span class="nav-icon garage-icon" aria-hidden="true"></span>
             Garage
           </a>
@@ -54,7 +54,7 @@
             </span>
             Insights
           </a>
-          <a class="nav-item" href="#settingsCard">
+          <a class="nav-item" href="#settingsCard" data-reveal-section="settings">
             <span class="nav-icon settings-icon" aria-hidden="true"></span>
             Settings
           </a>
@@ -117,7 +117,7 @@
                 aria-controls="vehicleCard"
                 aria-expanded="false"
               >
-                Manage garage
+                Add a car
               </button>
               <button
                 id="showSettingsSectionBtn"
@@ -195,6 +195,15 @@
               <div>
                 <p class="eyebrow">Garage</p>
                 <h2>Add a car</h2>
+              </div>
+              <div class="section-actions">
+                <button
+                  class="ghost-button dark-ghost section-toggle"
+                  type="button"
+                  data-close-section="vehicle"
+                >
+                  Close
+                </button>
               </div>
             </div>
             <form id="vehicleForm" class="stack-form">
@@ -743,6 +752,15 @@
               <div>
                 <p class="eyebrow">Settings</p>
                 <h2>Location and preferences</h2>
+              </div>
+              <div class="section-actions">
+                <button
+                  class="ghost-button dark-ghost section-toggle"
+                  type="button"
+                  data-close-section="settings"
+                >
+                  Close
+                </button>
               </div>
             </div>
             <form id="settingsForm" class="stack-form">

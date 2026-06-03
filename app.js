@@ -183,6 +183,8 @@ const elements = {
   vehicleCard: document.querySelector("#vehicleCard"),
   settingsCard: document.querySelector("#settingsCard"),
   workspaceSwitches: document.querySelectorAll("[data-trip-workspace-target]"),
+  sectionRevealLinks: document.querySelectorAll("[data-reveal-section]"),
+  sectionCloseButtons: document.querySelectorAll("[data-close-section]"),
 };
 
 function getFormField(form, name) {
@@ -231,6 +233,15 @@ function bindEvents() {
   elements.showSettingsSectionBtn.addEventListener("click", () =>
     toggleSection("settings")
   );
+  for (const link of elements.sectionRevealLinks) {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      revealSection(link.dataset.revealSection);
+    });
+  }
+  for (const button of elements.sectionCloseButtons) {
+    button.addEventListener("click", () => hideSection(button.dataset.closeSection));
+  }
   for (const button of document.querySelectorAll("[data-fold-toggle]")) {
     button.addEventListener("click", () =>
       toggleFoldableSection(button.dataset.foldToggle)
@@ -998,7 +1009,7 @@ function renderHeroChart(values, color, options = {}) {
   const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
 
   return `
-    <svg viewBox="0 0 180 120" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <svg viewBox="0 0 180 120" preserveAspectRatio="none" aria-hidden="true">
       ${renderChartAxes({
         minLabel: yFormatter(min),
         midLabel: yFormatter(mid),
@@ -1058,7 +1069,7 @@ function renderLineChart(values, color, options = {}) {
     .join(" ");
 
   return `
-    <svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <svg viewBox="0 0 160 100" preserveAspectRatio="none" aria-hidden="true">
       ${renderChartAxes({
         minLabel: yFormatter(min),
         midLabel: yFormatter(mid),
@@ -1109,7 +1120,7 @@ function renderBarChart(values, color, options = {}) {
     .join("");
 
   return `
-    <svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <svg viewBox="0 0 160 100" preserveAspectRatio="none" aria-hidden="true">
       ${renderChartAxes({
         minLabel: yFormatter(0),
         midLabel: yFormatter(mid),
@@ -1406,12 +1417,8 @@ function renderSectionVisibility() {
     "aria-expanded",
     String(sectionVisibility.settings)
   );
-  elements.showVehicleSectionBtn.textContent = sectionVisibility.vehicle
-    ? "Close car section"
-    : "Add a car";
-  elements.showSettingsSectionBtn.textContent = sectionVisibility.settings
-    ? "Close settings"
-    : "Open settings";
+  elements.showVehicleSectionBtn.textContent = "Add a car";
+  elements.showSettingsSectionBtn.textContent = "Open settings";
 }
 
 function renderFoldableSections() {
