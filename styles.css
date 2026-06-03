@@ -52,6 +52,9 @@
   --chart-surface-glow: rgba(203, 105, 49, 0.06);
   --report-emphasis-glow: rgba(214, 176, 106, 0.16);
   --mobile-dock-bg: rgba(255, 251, 245, 0.96);
+  --control-strong-bg: #25221f;
+  --control-strong-ink: #fffdf8;
+  --control-subtle-bg: rgba(31, 29, 26, 0.04);
   font-family: "Manrope", sans-serif;
 }
 
@@ -109,6 +112,9 @@
   --chart-surface-glow: rgba(239, 138, 85, 0.08);
   --report-emphasis-glow: rgba(224, 190, 127, 0.12);
   --mobile-dock-bg: rgba(34, 29, 25, 0.96);
+  --control-strong-bg: #f4eee5;
+  --control-strong-ink: #171412;
+  --control-subtle-bg: rgba(255, 247, 238, 0.06);
 }
 
 * {
@@ -266,7 +272,7 @@ h3,
 
 h1 {
   margin-top: 10px;
-  color: #fff9ef;
+  color: var(--hero-panel-title);
   font-size: clamp(2.6rem, 5vw, 4.2rem);
 }
 
@@ -451,13 +457,13 @@ h1 {
 
 .primary-button {
   padding: 0 16px;
-  background: #25221f;
-  color: #fff;
+  background: var(--control-strong-bg);
+  color: var(--control-strong-ink);
 }
 
 .dark-ghost {
   border: 1px solid var(--line);
-  background: rgba(31, 29, 26, 0.04);
+  background: var(--control-subtle-bg);
   color: var(--ink);
 }
 
@@ -807,8 +813,8 @@ textarea:disabled {
 }
 
 .chart-switch.active {
-  background: #25221f;
-  color: #fff;
+  background: var(--control-strong-bg);
+  color: var(--control-strong-ink);
 }
 
 .chart-metrics,
@@ -1000,8 +1006,8 @@ td strong {
 }
 
 .workspace-switch.is-active {
-  background: #25221f;
-  color: #fff;
+  background: var(--control-strong-bg);
+  color: var(--control-strong-ink);
 }
 
 .planner-toggle {
