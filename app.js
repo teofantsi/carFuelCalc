@@ -827,7 +827,7 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       color: "var(--accent)",
       highlight: buildEfficiencyMetrics(efficiencyValues)[0]?.value || "Pending",
       options: {
-        yFormatter: (value) => formatAxisNumber(value, 1),
+        yFormatter: formatEfficiencyAxisLabel,
         xLabels: efficiencyLabels,
       },
     },
@@ -4586,6 +4586,24 @@ function formatMonthLabel(value) {
 
 function formatAxisNumber(value, digits = 1) {
   return Number(value).toFixed(digits);
+}
+
+function formatEfficiencyAxisLabel(kmPerLiter) {
+  if (!Number.isFinite(kmPerLiter) || kmPerLiter <= 0) {
+    return "-";
+  }
+
+  switch (state.settings.consumptionMode) {
+    case "mpgUk":
+      return `${formatAxisNumber(kmPerLiter * 2.82481, 0)} mpg`;
+    case "mpgUs":
+      return `${formatAxisNumber(kmPerLiter * 2.35215, 0)} mpg`;
+    case "kmPerL":
+      return `${formatAxisNumber(kmPerLiter, 1)} km/L`;
+    case "lPer100km":
+    default:
+      return `${formatAxisNumber(100 / kmPerLiter, 1)} L/100`;
+  }
 }
 
 function formatAxisDistance(value, unit) {
