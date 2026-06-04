@@ -801,12 +801,15 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       getVehicleById(entry.vehicleId)?.distanceUnit || fillUpVehicleUnit
     )
   );
+  const efficiencyChartValues = efficiencyValues.map((value) =>
+    toEfficiencyDisplayValue(value, state.settings.consumptionMode)
+  );
   const efficiencyLabels = efficiencyEntries.map((entry) => formatChartDateLabel(entry.date));
   const priceValues = fillUps.map((entry) => entry.pricePerLiter).filter((value) => Number.isFinite(value));
   const priceLabels = fillUps
     .filter((entry) => Number.isFinite(entry.pricePerLiter))
     .map((entry) => formatChartDateLabel(entry.date));
-  const monthlySpendSeries = buildMonthlySpendSeries(fillUps, trips, ownershipCosts);
+  const monthlySpendSeries = buildMonthlyFuelSpendSeries(fillUps);
   const monthlySpendValues = monthlySpendSeries.map((item) => item.value);
   const monthlySpendLabels = monthlySpendSeries.map((item) => item.label);
   const tripDistanceValues = trips
@@ -823,11 +826,11 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       title: "Efficiency trend",
       meta: state.settings.consumptionMode.toUpperCase(),
       metrics: buildEfficiencyMetrics(efficiencyValues),
-      values: efficiencyValues,
+      values: efficiencyChartValues,
       color: "var(--accent)",
       highlight: buildEfficiencyMetrics(efficiencyValues)[0]?.value || "Pending",
       options: {
-        yFormatter: formatEfficiencyAxisLabel,
+        yFormatter: (value) => formatEfficiencyAxisLabel(value, state.settings.consumptionMode),
         xLabels: efficiencyLabels,
       },
     },
@@ -853,7 +856,7 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       id: "monthlySpend",
       shortLabel: "Monthly spend",
       title: "Monthly spend",
-      meta: "Fill-ups + trip fuel",
+      meta: "Fuel fill-ups only",
       metrics: buildMonthlySpendMetrics(monthlySpendValues),
       values: monthlySpendValues,
       color: "var(--sage)",
@@ -1252,11 +1255,12 @@ function buildReports(fillUps, trips) {
   const ownershipCosts = getFilteredOwnershipCosts();
   const totals = summarizeEntries(fillUps, trips, ownershipCosts);
   const monthSeries = buildMonthlySpendSeries(fillUps, trips, ownershipCosts, { limit: null });
+  const fuelMonthSeries = buildMonthlyFuelSpendSeries(fillUps, { limit: null });
   const yearSeries = buildYearlySpendSeries(fillUps, trips, ownershipCosts);
-  const currentMonth = monthSeries.at(-1);
-  const previousMonth = monthSeries.at(-2);
-  const peakMonth = monthSeries.length
-    ? monthSeries.reduce((best, item) => (item.value > best.value ? item : best), monthSeries[0])
+  const currentMonth = fuelMonthSeries.at(-1);
+  const previousMonth = fuelMonthSeries.at(-2);
+  const peakMonth = fuelMonthSeries.length
+    ? fuelMonthSeries.reduce((best, item) => (item.value > best.value ? item : best), fuelMonthSeries[0])
     : null;
   const yearlyPeak = yearSeries.length
     ? yearSeries.reduce((best, item) => (item.totalSpend > best.totalSpend ? item : best), yearSeries[0])
@@ -3868,6 +3872,19 @@ function buildMonthlySpendSeries(fillUps, trips, ownershipCosts = [], options = 
   return limit ? series.slice(-limit) : series;
 }
 
+function buildMonthlyFuelSpendSeries(fillUps, options = {}) {
+  const bucket = new Map();
+  for (const entry of fillUps) {
+    const month = entry.date.slice(0, 7);
+    bucket.set(month, (bucket.get(month) || 0) + (entry.totalCost || 0));
+  }
+  const limit = options.limit === undefined ? 8 : options.limit;
+  const series = [...bucket.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([month, value]) => ({ label: formatMonthLabel(month), value }));
+  return limit ? series.slice(-limit) : series;
+}
+
 function buildYearlySpendSeries(fillUps, trips, ownershipCosts = []) {
   const bucket = new Map();
 
@@ -4273,6 +4290,24 @@ function formatEfficiencyFromNormalized(kmPerLiter, mode) {
   }
 }
 
+function toEfficiencyDisplayValue(kmPerLiter, mode) {
+  if (!Number.isFinite(kmPerLiter) || kmPerLiter <= 0) {
+    return null;
+  }
+
+  switch (mode) {
+    case "mpgUk":
+      return kmPerLiter * 2.82481;
+    case "mpgUs":
+      return kmPerLiter * 2.35215;
+    case "lPer100km":
+      return 100 / kmPerLiter;
+    case "kmPerL":
+    default:
+      return kmPerLiter;
+  }
+}
+
 function formatWeather(weather) {
   if (!weather) {
     return "Unavailable";
@@ -4588,21 +4623,21 @@ function formatAxisNumber(value, digits = 1) {
   return Number(value).toFixed(digits);
 }
 
-function formatEfficiencyAxisLabel(kmPerLiter) {
-  if (!Number.isFinite(kmPerLiter) || kmPerLiter <= 0) {
+function formatEfficiencyAxisLabel(value, mode) {
+  if (!Number.isFinite(value)) {
     return "-";
   }
 
-  switch (state.settings.consumptionMode) {
+  switch (mode) {
     case "mpgUk":
-      return `${formatAxisNumber(kmPerLiter * 2.82481, 0)} mpg`;
+      return `${formatAxisNumber(value, 0)} mpg`;
     case "mpgUs":
-      return `${formatAxisNumber(kmPerLiter * 2.35215, 0)} mpg`;
+      return `${formatAxisNumber(value, 0)} mpg`;
     case "kmPerL":
-      return `${formatAxisNumber(kmPerLiter, 1)} km/L`;
+      return `${formatAxisNumber(value, 1)} km/L`;
     case "lPer100km":
     default:
-      return `${formatAxisNumber(100 / kmPerLiter, 1)} L/100`;
+      return `${formatAxisNumber(value, 1)} L/100`;
   }
 }
 
