@@ -836,6 +836,10 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       options: {
         yFormatter: (value) => formatEfficiencyAxisLabel(value, state.settings.consumptionMode),
         xLabels: efficiencyLabels,
+        yDomain: buildReadableChartRange(efficiencyChartValues, {
+          paddingRatio: 0.22,
+          minimumPadding: getEfficiencyMinimumAxisPadding(state.settings.consumptionMode),
+        }),
       },
     },
     {
@@ -868,6 +872,11 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       options: {
         yFormatter: (value) => formatCurrency(value),
         xLabels: monthlySpendLabels,
+        yDomain: buildReadableChartRange(monthlySpendValues, {
+          includeZero: true,
+          paddingRatio: 0.12,
+          minimumPadding: 5,
+        }),
       },
     },
     {
@@ -882,6 +891,11 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       options: {
         yFormatter: (value) => formatAxisDistance(value, tripVehicleUnit),
         xLabels: tripDistanceLabels,
+        yDomain: buildReadableChartRange(tripDistanceValues, {
+          includeZero: true,
+          paddingRatio: 0.12,
+          minimumPadding: 1,
+        }),
       },
     },
   ];
@@ -1019,8 +1033,9 @@ function renderHeroChart(values, color, options = {}) {
     return '<p class="empty">More data will draw this chart.</p>';
   }
 
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const domain = options.yDomain || {};
+  const min = Number.isFinite(domain.min) ? domain.min : Math.min(...values);
+  const max = Number.isFinite(domain.max) ? domain.max : Math.max(...values);
   const mid = min + (max - min) / 2;
   const areaBaseY = 84;
   const points = values.map((value, index) => {
@@ -1035,7 +1050,7 @@ function renderHeroChart(values, color, options = {}) {
   const unit = options.yUnit || '';
 
   return `
-    <svg viewBox="0 0 180 120" preserveAspectRatio="none" aria-hidden="true">
+    <svg viewBox="0 0 180 120" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       ${renderChartAxes({
         minLabel: yFormatter(min),
         midLabel: yFormatter(mid),
@@ -1096,7 +1111,7 @@ function renderLineChart(values, color, options = {}) {
     .join(" ");
 
   return `
-    <svg viewBox="0 0 160 100" preserveAspectRatio="none" aria-hidden="true">
+    <svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       ${renderChartAxes({
         minLabel: yFormatter(min),
         midLabel: yFormatter(mid),
@@ -1133,8 +1148,10 @@ function renderBarChart(values, color, options = {}) {
     return '<p class="empty">More data will draw this chart.</p>';
   }
 
-  const max = Math.max(...values, 1);
-  const mid = max / 2;
+  const domain = options.yDomain || {};
+  const min = Number.isFinite(domain.min) ? domain.min : 0;
+  const max = Number.isFinite(domain.max) ? domain.max : Math.max(...values, 1);
+  const mid = min + (max - min) / 2;
   const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
 
   const bars = values
@@ -1142,15 +1159,15 @@ function renderBarChart(values, color, options = {}) {
     .map((value, index, series) => {
       const barWidth = 112 / series.length;
       const x = 34 + index * barWidth;
-      const height = (value / max) * 58;
-      return `<rect x="${x}" y="${86 - height}" width="${Math.max(barWidth - 2, 4)}" height="${height}" rx="3" fill="${color}" opacity="0.86" />`;
+      const height = ((value - min) / Math.max(max - min, 1)) * 58;
+      return `<rect x="${x}" y="${86 - height}" width="${Math.max(barWidth - 2, 4)}" height="${Math.max(height, value > 0 ? 2 : 0)}" rx="3" fill="${color}" opacity="0.86" />`;
     })
     .join("");
 
   return `
-    <svg viewBox="0 0 160 100" preserveAspectRatio="none" aria-hidden="true">
+    <svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       ${renderChartAxes({
-        minLabel: yFormatter(0),
+        minLabel: yFormatter(min),
         midLabel: yFormatter(mid),
         maxLabel: yFormatter(max),
         xTicks: buildBarXAxisTicks((options.xLabels || []).slice(-8)),
@@ -4695,6 +4712,43 @@ function buildReactiveRange(values, options = {}) {
     min: Math.max(0, rawMin - padding),
     max: rawMax + padding,
   };
+}
+
+function buildReadableChartRange(values, options = {}) {
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  if (!finiteValues.length) {
+    return null;
+  }
+
+  const rawMin = Math.min(...finiteValues);
+  const rawMax = Math.max(...finiteValues);
+  const rawRange = rawMax - rawMin;
+  const padding = Math.max(
+    rawRange * (options.paddingRatio ?? 0.15),
+    options.minimumPadding ?? 0
+  );
+  const min = options.includeZero
+    ? 0
+    : Math.max(0, rawMin - padding);
+  const max = rawMax + padding;
+
+  return {
+    min,
+    max: max > min ? max : min + Math.max(options.minimumPadding ?? 1, 1),
+  };
+}
+
+function getEfficiencyMinimumAxisPadding(mode) {
+  switch (mode) {
+    case "mpgUk":
+    case "mpgUs":
+      return 3;
+    case "kmPerL":
+      return 1;
+    case "lPer100km":
+    default:
+      return 0.8;
+  }
 }
 
 function renderXAxisTicks(ticks, y) {
