@@ -805,10 +805,14 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
     toEfficiencyDisplayValue(value, state.settings.consumptionMode)
   );
   const efficiencyLabels = efficiencyEntries.map((entry) => formatChartDateLabel(entry.date));
-  const priceValues = fillUps.map((entry) => entry.pricePerLiter).filter((value) => Number.isFinite(value));
-  const priceLabels = fillUps
-    .filter((entry) => Number.isFinite(entry.pricePerLiter))
-    .map((entry) => formatChartDateLabel(entry.date));
+  const priceEntries = fillUps
+    .map((entry) => ({
+      ...entry,
+      resolvedPricePerLiter: getResolvedFillUpPricePerLiter(entry),
+    }))
+    .filter((entry) => Number.isFinite(entry.resolvedPricePerLiter));
+  const priceValues = priceEntries.map((entry) => entry.resolvedPricePerLiter);
+  const priceLabels = priceEntries.map((entry) => formatChartDateLabel(entry.date));
   const monthlySpendSeries = buildMonthlyFuelSpendSeries(fillUps);
   const monthlySpendValues = monthlySpendSeries.map((item) => item.value);
   const monthlySpendLabels = monthlySpendSeries.map((item) => item.label);
@@ -839,10 +843,10 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
       shortLabel: "Fuel price",
       title: "Fuel price trend",
       meta: "Price per litre",
-      metrics: buildPriceMetrics(priceValues),
+      metrics: buildPriceMetrics(priceEntries),
       values: priceValues,
       color: "var(--sky)",
-      highlight: buildPriceMetrics(priceValues)[0]?.value || "Pending",
+      highlight: buildPriceMetrics(priceEntries)[0]?.value || "Pending",
       options: {
         yFormatter: (value) => formatCurrency(value),
         xLabels: priceLabels,
@@ -908,12 +912,13 @@ function buildEfficiencyMetrics(values) {
   ];
 }
 
-function buildPriceMetrics(values) {
-  if (!values.length) {
+function buildPriceMetrics(entries) {
+  if (!entries.length) {
     return [];
   }
 
-  const latest = values.at(-1);
+  const values = entries.map((entry) => entry.resolvedPricePerLiter);
+  const latest = entries.at(-1)?.resolvedPricePerLiter;
   const average = values.reduce((sum, value) => sum + value, 0) / values.length;
   const highest = Math.max(...values);
 
@@ -931,6 +936,23 @@ function buildPriceMetrics(values) {
       value: `${formatCurrency(highest)}/L`,
     },
   ];
+}
+
+function getResolvedFillUpPricePerLiter(entry) {
+  if (Number.isFinite(entry?.pricePerLiter) && entry.pricePerLiter > 0) {
+    return entry.pricePerLiter;
+  }
+
+  if (
+    Number.isFinite(entry?.totalCost) &&
+    entry.totalCost > 0 &&
+    Number.isFinite(entry?.liters) &&
+    entry.liters > 0
+  ) {
+    return entry.totalCost / entry.liters;
+  }
+
+  return null;
 }
 
 function buildMonthlySpendMetrics(values) {
@@ -1010,6 +1032,7 @@ function renderHeroChart(values, color, options = {}) {
   const maxPoint = points.reduce((best, point) => (point.value > best.value ? point : best), points[0]);
   const minPoint = points.reduce((best, point) => (point.value < best.value ? point : best), points[0]);
   const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
+  const unit = options.yUnit || '';
 
   return `
     <svg viewBox="0 0 180 120" preserveAspectRatio="none" aria-hidden="true">
@@ -1063,6 +1086,7 @@ function renderLineChart(values, color, options = {}) {
   const max = Number.isFinite(domain.max) ? domain.max : Math.max(...values);
   const mid = min + (max - min) / 2;
   const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
+
   const points = values
     .map((value, index) => {
       const x = 32 + (index / Math.max(values.length - 1, 1)) * 118;
@@ -1112,6 +1136,7 @@ function renderBarChart(values, color, options = {}) {
   const max = Math.max(...values, 1);
   const mid = max / 2;
   const yFormatter = options.yFormatter || ((value) => formatNumber(value, 1));
+
   const bars = values
     .slice(-8)
     .map((value, index, series) => {
