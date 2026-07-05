@@ -1791,8 +1791,10 @@ function renderFuelTable() {
           <td data-label="Efficiency">${metrics.efficiencyLabel}</td>
           <td data-label="Weather">${formatWeather(entry.weather)}</td>
           <td data-label="Actions">
-            <button class="inline-link" data-edit-fillup="${entry.id}" type="button">Edit</button>
-            <button class="danger-link" data-delete-fillup="${entry.id}" type="button">Delete</button>
+            <div class="table-actions">
+              <button class="inline-link" data-edit-fillup="${entry.id}" type="button">Edit</button>
+              <button class="danger-link" data-delete-fillup="${entry.id}" type="button">Delete</button>
+            </div>
           </td>
         </tr>
       `;
@@ -1858,8 +1860,10 @@ function renderOwnershipCostTable() {
           <td data-label="Cost">${formatCurrency(cost.totalCost || 0)}</td>
           <td data-label="Notes">${escapeHtml(cost.notes || "No notes")}</td>
           <td data-label="Actions">
-            <button class="inline-link" data-edit-ownership-cost="${cost.id}" type="button">Edit</button>
-            <button class="danger-link" data-delete-ownership-cost="${cost.id}" type="button">Delete</button>
+            <div class="table-actions">
+              <button class="inline-link" data-edit-ownership-cost="${cost.id}" type="button">Edit</button>
+              <button class="danger-link" data-delete-ownership-cost="${cost.id}" type="button">Delete</button>
+            </div>
           </td>
         </tr>
       `;
