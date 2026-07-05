@@ -2176,7 +2176,8 @@ async function handleFillUpSubmit(event) {
     return;
   }
 
-  const formData = new FormData(event.currentTarget);
+  const form = elements.fillUpForm;
+  const formData = new FormData(form);
   const pricing = resolveFillUpPricing({
     liters: numberOrNull(formData.get("liters")),
     totalCost: numberOrNull(formData.get("totalCost")),
@@ -2213,10 +2214,10 @@ async function handleFillUpSubmit(event) {
   state.fillUps.push(fillUp);
   recomputeEfficiencies();
 
-  event.currentTarget.reset();
-  getFormField(event.currentTarget, "date").value = getLocalDateString();
+  form.reset();
+  getFormField(form, "date").value = getLocalDateString();
   if (vehicle) {
-    getFormField(event.currentTarget, "vehicleId").value = vehicle.id;
+    getFormField(form, "vehicleId").value = vehicle.id;
   }
   resetFillUpFormDerivedState();
   persistAndRender();
@@ -2234,7 +2235,8 @@ async function handleTripSubmit(event) {
     return;
   }
 
-  const formData = new FormData(event.currentTarget);
+  const form = elements.tripForm;
+  const formData = new FormData(form);
   const vehicleId = formData.get("vehicleId").toString();
   const vehicle = getVehicleById(vehicleId);
   const routeFields = getRoutePlannerFields();
@@ -2259,7 +2261,7 @@ async function handleTripSubmit(event) {
   const pricePerLiter = numberOrNull(formData.get("fuelPricePerLiter"));
   const routeType = normalizeRouteType(formData.get("routeType"));
   const routeAverageSpeedMph = numberOrNull(
-    getFormField(event.currentTarget, "plannedDistance").dataset.routeAverageSpeedMph
+    getFormField(form, "plannedDistance").dataset.routeAverageSpeedMph
   );
   const routeWaypoints = routeFields.routeWaypoints;
   const estimatedFuel = estimateTripFuel({
@@ -2289,7 +2291,7 @@ async function handleTripSubmit(event) {
     routeSource: Number.isFinite(plannedDistance) ? "osrm" : null,
     routeType,
     routeAverageSpeedMph,
-    routePolyline: getFormField(event.currentTarget, "plannedDistance").dataset.routePolyline || "",
+    routePolyline: getFormField(form, "plannedDistance").dataset.routePolyline || "",
     routeWaypoints,
     category: formData.get("category").toString().trim(),
     totalCost,
@@ -2306,10 +2308,10 @@ async function handleTripSubmit(event) {
     ),
   });
 
-  event.currentTarget.reset();
-  getFormField(event.currentTarget, "date").value = getLocalDateString();
+  form.reset();
+  getFormField(form, "date").value = getLocalDateString();
   if (vehicle) {
-    getFormField(event.currentTarget, "vehicleId").value = vehicle.id;
+    getFormField(form, "vehicleId").value = vehicle.id;
   }
   resetTripFormDerivedState();
   syncTripFormDerivedFields();
@@ -2437,7 +2439,8 @@ async function handleOwnershipCostSubmit(event) {
     return;
   }
 
-  const formData = new FormData(event.currentTarget);
+  const form = elements.ownershipCostForm;
+  const formData = new FormData(form);
   const vehicleId = formData.get("vehicleId").toString();
   const vehicle = getVehicleById(vehicleId);
 
@@ -2450,11 +2453,11 @@ async function handleOwnershipCostSubmit(event) {
     notes: formData.get("notes").toString().trim(),
   });
 
-  event.currentTarget.reset();
-  getFormField(event.currentTarget, "date").value = getLocalDateString();
-  getFormField(event.currentTarget, "category").value = "service";
+  form.reset();
+  getFormField(form, "date").value = getLocalDateString();
+  getFormField(form, "category").value = "service";
   if (vehicle) {
-    getFormField(event.currentTarget, "vehicleId").value = vehicle.id;
+    getFormField(form, "vehicleId").value = vehicle.id;
   }
   persistAndRender();
   await syncRemoteState();
