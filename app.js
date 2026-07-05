@@ -113,6 +113,8 @@ let state = loadState();
 let syncInFlight = false;
 let vehicleLookupResult = null;
 let editingVehicleId = "";
+let editingFillUpId = "";
+let editingOwnershipCostId = "";
 let lastFillUpPricingField = "";
 let lastTripVehicleSelection = "";
 let tripWorkspaceFocus = "planner";
@@ -147,6 +149,7 @@ const elements = {
   vehicleLookupSummary: document.querySelector("#vehicleLookupSummary"),
   cancelVehicleEditBtn: document.querySelector("#cancelVehicleEditBtn"),
   fillUpForm: document.querySelector("#fillUpForm"),
+  cancelFillUpEditBtn: document.querySelector("#cancelFillUpEditBtn"),
   fillUpCalcStatus: document.querySelector("#fillUpCalcStatus"),
   fillUpTableBody: document.querySelector("#fillUpTableBody"),
   routePlannerForm: document.querySelector("#routePlannerForm"),
@@ -160,6 +163,7 @@ const elements = {
   tripEntryCard: document.querySelector("#tripEntryCard"),
   tripTableBody: document.querySelector("#tripTableBody"),
   ownershipCostForm: document.querySelector("#ownershipCostForm"),
+  cancelOwnershipCostEditBtn: document.querySelector("#cancelOwnershipCostEditBtn"),
   ownershipCostTableBody: document.querySelector("#ownershipCostTableBody"),
   ownershipBreakdownBody: document.querySelector("#ownershipBreakdownBody"),
   settingsForm: document.querySelector("#settingsForm"),
@@ -254,6 +258,7 @@ function bindEvents() {
     handleRegistrationInput
   );
   elements.cancelVehicleEditBtn.addEventListener("click", resetVehicleForm);
+  elements.cancelFillUpEditBtn.addEventListener("click", resetFillUpForm);
   elements.fillUpForm.addEventListener("submit", (event) => void handleFillUpSubmit(event));
   for (const fieldName of ["liters", "totalCost", "pricePerLiter"]) {
     getFormField(elements.fillUpForm, fieldName).addEventListener("input", (event) => {
@@ -277,6 +282,7 @@ function bindEvents() {
   elements.ownershipCostForm.addEventListener("submit", (event) =>
     void handleOwnershipCostSubmit(event)
   );
+  elements.cancelOwnershipCostEditBtn.addEventListener("click", resetOwnershipCostForm);
   for (const fieldName of [
     "vehicleId",
     "date",
@@ -1784,11 +1790,18 @@ function renderFuelTable() {
           <td data-label="Cost">${formatCurrency(entry.totalCost)}</td>
           <td data-label="Efficiency">${metrics.efficiencyLabel}</td>
           <td data-label="Weather">${formatWeather(entry.weather)}</td>
-          <td data-label="Actions"><button class="danger-link" data-delete-fillup="${entry.id}" type="button">Delete</button></td>
+          <td data-label="Actions">
+            <button class="inline-link" data-edit-fillup="${entry.id}" type="button">Edit</button>
+            <button class="danger-link" data-delete-fillup="${entry.id}" type="button">Delete</button>
+          </td>
         </tr>
       `;
     })
     .join("");
+
+  for (const button of elements.fillUpTableBody.querySelectorAll("[data-edit-fillup]")) {
+    button.addEventListener("click", () => startFillUpEdit(button.dataset.editFillup));
+  }
 
   for (const button of elements.fillUpTableBody.querySelectorAll("[data-delete-fillup]")) {
     button.addEventListener("click", () => void deleteFillUp(button.dataset.deleteFillup));
@@ -1844,11 +1857,20 @@ function renderOwnershipCostTable() {
           <td data-label="Type">${escapeHtml(formatOwnershipCategory(cost.category))}</td>
           <td data-label="Cost">${formatCurrency(cost.totalCost || 0)}</td>
           <td data-label="Notes">${escapeHtml(cost.notes || "No notes")}</td>
-          <td data-label="Actions"><button class="danger-link" data-delete-ownership-cost="${cost.id}" type="button">Delete</button></td>
+          <td data-label="Actions">
+            <button class="inline-link" data-edit-ownership-cost="${cost.id}" type="button">Edit</button>
+            <button class="danger-link" data-delete-ownership-cost="${cost.id}" type="button">Delete</button>
+          </td>
         </tr>
       `;
     })
     .join("");
+
+  for (const button of elements.ownershipCostTableBody.querySelectorAll("[data-edit-ownership-cost]")) {
+    button.addEventListener("click", () =>
+      startOwnershipCostEdit(button.dataset.editOwnershipCost)
+    );
+  }
 
   for (const button of elements.ownershipCostTableBody.querySelectorAll("[data-delete-ownership-cost]")) {
     button.addEventListener("click", () => void deleteOwnershipCost(button.dataset.deleteOwnershipCost));
@@ -2072,6 +2094,30 @@ function resetVehicleForm() {
   resetVehicleLookupUi();
 }
 
+function resetFillUpForm() {
+  editingFillUpId = "";
+  elements.fillUpForm.reset();
+  getFormField(elements.fillUpForm, "date").value = getLocalDateString();
+  if (state.vehicles[0]) {
+    getFormField(elements.fillUpForm, "vehicleId").value = state.vehicles[0].id;
+  }
+  getSubmitButton(elements.fillUpForm).textContent = "Save fill-up";
+  elements.cancelFillUpEditBtn.hidden = true;
+  resetFillUpFormDerivedState();
+}
+
+function resetOwnershipCostForm() {
+  editingOwnershipCostId = "";
+  elements.ownershipCostForm.reset();
+  getFormField(elements.ownershipCostForm, "date").value = getLocalDateString();
+  getFormField(elements.ownershipCostForm, "category").value = "service";
+  if (state.vehicles[0]) {
+    getFormField(elements.ownershipCostForm, "vehicleId").value = state.vehicles[0].id;
+  }
+  getSubmitButton(elements.ownershipCostForm).textContent = "Save cost";
+  elements.cancelOwnershipCostEditBtn.hidden = true;
+}
+
 function startVehicleEdit(vehicleId) {
   const vehicle = getVehicleById(vehicleId);
   if (!vehicle) {
@@ -2110,6 +2156,46 @@ function startVehicleEdit(vehicleId) {
       ? "Editing vehicle details. Run plate lookup again if you want to refresh the DVLA estimate."
       : "Set the vehicle MPG manually, or add a registration plate to estimate it."
   );
+}
+
+function startFillUpEdit(entryId) {
+  const entry = state.fillUps.find((fillUp) => fillUp.id === entryId);
+  if (!entry) {
+    return;
+  }
+
+  editingFillUpId = entry.id;
+  getFormField(elements.fillUpForm, "vehicleId").value = entry.vehicleId;
+  getFormField(elements.fillUpForm, "date").value = entry.date;
+  getFormField(elements.fillUpForm, "odometer").value = entry.odometer ?? "";
+  getFormField(elements.fillUpForm, "liters").value = entry.liters ?? "";
+  getFormField(elements.fillUpForm, "totalCost").value = entry.totalCost ?? "";
+  getFormField(elements.fillUpForm, "pricePerLiter").value = entry.pricePerLiter ?? "";
+  getFormField(elements.fillUpForm, "station").value = entry.station || "";
+  getFormField(elements.fillUpForm, "isPartial").value = String(Boolean(entry.isPartial));
+  getFormField(elements.fillUpForm, "notes").value = entry.notes || "";
+  getSubmitButton(elements.fillUpForm).textContent = "Update fill-up";
+  elements.cancelFillUpEditBtn.hidden = false;
+  lastFillUpPricingField = "";
+  syncFillUpPricingFields();
+  elements.fillUpForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function startOwnershipCostEdit(entryId) {
+  const cost = state.ownershipCosts.find((item) => item.id === entryId);
+  if (!cost) {
+    return;
+  }
+
+  editingOwnershipCostId = cost.id;
+  getFormField(elements.ownershipCostForm, "vehicleId").value = cost.vehicleId;
+  getFormField(elements.ownershipCostForm, "date").value = cost.date;
+  getFormField(elements.ownershipCostForm, "category").value = cost.category;
+  getFormField(elements.ownershipCostForm, "totalCost").value = cost.totalCost ?? "";
+  getFormField(elements.ownershipCostForm, "notes").value = cost.notes || "";
+  getSubmitButton(elements.ownershipCostForm).textContent = "Update cost";
+  elements.cancelOwnershipCostEditBtn.hidden = false;
+  elements.ownershipCostForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function handleVehicleSubmit(event) {
@@ -2192,34 +2278,44 @@ async function handleFillUpSubmit(event) {
   const totalCost = pricing.totalCost;
   const vehicleId = formData.get("vehicleId").toString();
   const vehicle = getVehicleById(vehicleId);
+  const existingFillUp = editingFillUpId
+    ? state.fillUps.find((entry) => entry.id === editingFillUpId)
+    : null;
+  const nextDate = formData.get("date").toString();
+  const nextStation = formData.get("station").toString().trim();
   const fillUp = {
-    id: crypto.randomUUID(),
+    id: editingFillUpId || crypto.randomUUID(),
     vehicleId,
-    date: formData.get("date").toString(),
+    date: nextDate,
     odometer: Number(formData.get("odometer")),
     liters,
     totalCost,
     pricePerLiter: pricing.pricePerLiter,
-    station: formData.get("station").toString().trim(),
+    station: nextStation,
     isPartial: formData.get("isPartial").toString() === "true",
     notes: formData.get("notes").toString().trim(),
-    weather: await fetchWeatherForDate(
-      formData.get("date").toString(),
-      formData.get("station").toString().trim(),
-      { fallbackToHomeCity: true }
-    ),
+    weather:
+      existingFillUp &&
+      existingFillUp.date === nextDate &&
+      (existingFillUp.station || "") === nextStation
+        ? existingFillUp.weather || null
+        : await fetchWeatherForDate(nextDate, nextStation, { fallbackToHomeCity: true }),
   };
 
-  fillUp.efficiency = computeEfficiencyForNewFillUp(fillUp);
-  state.fillUps.push(fillUp);
+  if (editingFillUpId) {
+    state.fillUps = state.fillUps.map((entry) =>
+      entry.id === editingFillUpId ? fillUp : entry
+    );
+  } else {
+    fillUp.efficiency = computeEfficiencyForNewFillUp(fillUp);
+    state.fillUps.push(fillUp);
+  }
   recomputeEfficiencies();
 
-  form.reset();
-  getFormField(form, "date").value = getLocalDateString();
+  resetFillUpForm();
   if (vehicle) {
     getFormField(form, "vehicleId").value = vehicle.id;
   }
-  resetFillUpFormDerivedState();
   persistAndRender();
   await syncRemoteState();
   await refreshWeatherSummary();
@@ -2443,19 +2539,24 @@ async function handleOwnershipCostSubmit(event) {
   const formData = new FormData(form);
   const vehicleId = formData.get("vehicleId").toString();
   const vehicle = getVehicleById(vehicleId);
-
-  state.ownershipCosts.push({
-    id: crypto.randomUUID(),
+  const costPayload = {
+    id: editingOwnershipCostId || crypto.randomUUID(),
     vehicleId,
     date: formData.get("date").toString(),
     category: formData.get("category").toString(),
     totalCost: Number(formData.get("totalCost")),
     notes: formData.get("notes").toString().trim(),
-  });
+  };
 
-  form.reset();
-  getFormField(form, "date").value = getLocalDateString();
-  getFormField(form, "category").value = "service";
+  if (editingOwnershipCostId) {
+    state.ownershipCosts = state.ownershipCosts.map((cost) =>
+      cost.id === editingOwnershipCostId ? costPayload : cost
+    );
+  } else {
+    state.ownershipCosts.push(costPayload);
+  }
+
+  resetOwnershipCostForm();
   if (vehicle) {
     getFormField(form, "vehicleId").value = vehicle.id;
   }
@@ -2487,6 +2588,9 @@ function handleSettingsSubmit(event) {
 
 async function deleteFillUp(entryId) {
   state.fillUps = state.fillUps.filter((entry) => entry.id !== entryId);
+  if (editingFillUpId === entryId) {
+    resetFillUpForm();
+  }
   recomputeEfficiencies();
   persistAndRender();
   await syncRemoteState();
@@ -2500,6 +2604,9 @@ async function deleteTrip(entryId) {
 
 async function deleteOwnershipCost(entryId) {
   state.ownershipCosts = state.ownershipCosts.filter((cost) => cost.id !== entryId);
+  if (editingOwnershipCostId === entryId) {
+    resetOwnershipCostForm();
+  }
   persistAndRender();
   await syncRemoteState();
 }

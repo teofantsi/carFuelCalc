@@ -335,7 +335,17 @@
                 <div id="fillUpCalcStatus" class="lookup-status empty wide-field">
                   Enter any two of price per litre, volume, or total cost.
                 </div>
-                <button type="submit" class="primary-button">Save fill-up</button>
+                <div class="action-row wide-field">
+                  <button type="submit" class="primary-button">Save fill-up</button>
+                  <button
+                    id="cancelFillUpEditBtn"
+                    type="button"
+                    class="ghost-button dark-ghost"
+                    hidden
+                  >
+                    Cancel edit
+                  </button>
+                </div>
               </form>
             </div>
           </article>
@@ -387,7 +397,17 @@
                     placeholder="Annual premium, monthly finance payment, MOT + service, road tax renewal..."
                   ></textarea>
                 </label>
-                <button type="submit" class="primary-button">Save cost</button>
+                <div class="action-row wide-field">
+                  <button type="submit" class="primary-button">Save cost</button>
+                  <button
+                    id="cancelOwnershipCostEditBtn"
+                    type="button"
+                    class="ghost-button dark-ghost"
+                    hidden
+                  >
+                    Cancel edit
+                  </button>
+                </div>
               </form>
 
               <div class="section-heading cost-breakdown-heading compact">
