@@ -861,8 +861,8 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
         yFormatter: (value) => formatCurrency(value),
         xLabels: priceLabels,
         yDomain: buildReactiveRange(priceValues, {
-          paddingRatio: 0.08,
-          minimumPadding: 0.005,
+          paddingRatio: 0.02,
+          minimumPadding: 0.001,
         }),
       },
     },
@@ -4823,7 +4823,9 @@ function buildReactiveRange(values, options = {}) {
   }
 
   return {
-    min: Math.max(0, rawMin - padding),
+    // Keep reactive ranges closely tied to the visible min/max values so
+    // compact series like fuel prices do not look over-expanded on the y-axis.
+    min: rawMin - padding,
     max: rawMax + padding,
   };
 }
