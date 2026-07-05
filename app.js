@@ -861,8 +861,8 @@ function buildDashboardChartData(fillUps, trips, ownershipCosts, fillUpVehicleUn
         yFormatter: (value) => formatCurrency(value),
         xLabels: priceLabels,
         yDomain: buildReactiveRange(priceValues, {
-          paddingRatio: 0.02,
-          minimumPadding: 0.001,
+          paddingRatio: 0,
+          minimumPadding: 0,
         }),
       },
     },
